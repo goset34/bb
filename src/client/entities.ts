@@ -10,6 +10,7 @@ import { tickItemPhysics } from '../common/entity/physics';
 import { ItemStack, SerializedStack } from '../common/item/stack';
 import type { Packet } from '../common/net/protocol';
 import type { ClientLevel } from './world';
+import { MOBS } from '../common/entity/mobs';
 
 /** Hitbox sizes of entity types known to the client renderer; other systems add theirs. */
 export const ENTITY_SIZES: Record<string, [number, number]> = {
@@ -107,6 +108,8 @@ export class ClientEntities {
         if (e) {
           if (ev === 'hurt') e.interp.hurtTime = 10;
           if (ev === 'death') e.interp.deathTime = 1;
+          // Timestamp for event-driven animations (grazing, attacks, rams…)
+          e.data[`event:${ev}`] = e.interp.age;
         }
         this.emit(e, id, ev, p['data'] as number);
         return true;
@@ -177,6 +180,12 @@ export class ClientEntities {
 
   private applyMeta(e: ClientEntity, m: Record<string, unknown>): void {
     Object.assign(e.data, m);
+    const info = MOBS.get(e.type);
+    if (info) {
+      const k = e.data['baby'] === true ? info.baby ?? 0.5 : 1;
+      e.physics.width = info.width * k;
+      e.physics.height = info.height * k;
+    }
     if (m['item']) e.stack = ItemStack.fromJSON(m['item'] as SerializedStack);
   }
 
@@ -203,8 +212,9 @@ export class ClientEntities {
       } else if (e.type === 'item' || e.type === 'xp_orb') {
         tickItemPhysics(this.level, e);
       }
-      // Body yaw follows movement and lags behind the head (living entities)
-      if (e.type !== 'item' && e.type !== 'xp_orb') this.updateBody(e);
+      // Mobs receive their body rotation from the server; other living entities derive it
+      if (MOBS.has(e.type)) t.bodyYaw = t.yaw;
+      else if (e.type !== 'item' && e.type !== 'xp_orb') this.updateBody(e);
       // Limb swing
       const dx = t.x - t.px, dz = t.z - t.pz;
       i.prevLimbSwingAmount = i.limbSwingAmount;

@@ -174,7 +174,7 @@ function armorTexture(ctx: RenderContext, stack: ItemStack, legs: boolean): numb
 }
 
 /** Render a humanoid (player) with equipment. Shared with humanoid mobs in later milestones. */
-export function renderHumanoid(ctx: RenderContext, e: ClientEntity, x: number, y: number, z: number, skin: string, model: PlayerModel = playerModel): void {
+export function renderHumanoid(ctx: RenderContext, e: ClientEntity, x: number, y: number, z: number, skin: string, model: PlayerModel = playerModel, adjust?: (m: PlayerModel, e: ClientEntity, partial: number) => void): void {
   const mesh = ctx.mesh;
   const t = e.transform, i = e.interp;
   const p = ctx.partial;
@@ -193,6 +193,7 @@ export function renderHumanoid(ctx: RenderContext, e: ClientEntity, x: number, y
     sneaking, holdingMain: !main.isEmpty(), holdingOff: !off.isEmpty(), using: e.data['using'] === true,
     age: i.age + p, swimming, flying: false,
   });
+  adjust?.(model, e, p);
   applyLight(ctx, x + ctx.cam[0], y + ctx.cam[1] + 1, z + ctx.cam[2]);
   mesh.hurt = i.hurtTime > 0 || i.deathTime > 0 ? 1 : 0;
   mesh.push();
@@ -215,6 +216,10 @@ export function renderHumanoid(ctx: RenderContext, e: ClientEntity, x: number, y
     mesh.translate(0, 0.3, 0);
     mesh.rotate(0, (-(90 + pitch) * Math.PI) / 180);
     mesh.translate(0, -1.2, 0);
+  }
+  if (e.data['baby'] === true) {
+    mesh.scale(0.5);
+    model.head.scale = 1.5;
   }
   // Body
   mesh.layer = ctx.textures.layer(skin);

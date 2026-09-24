@@ -26,7 +26,7 @@ await p.waitForFunction(() => window.__strata.game && window.__strata.game.loade
 console.log('loaded in', Date.now() - t0, 'ms');
 if (extra) await p.evaluate(extra);
 await p.waitForTimeout(Number(waitMs));
-const dbg = await p.evaluate(() => { const g = window.__strata.game; g.hud.showDebug = true; return { fps: g.fps, chunks: g.level.chunks.size, meshes: g.meshes.meshes.size, vis: g.renderer.stats.visibleSections, draws: g.renderer.stats.drawCalls, pos: [g.player.entity.transform.x, g.player.entity.transform.y, g.player.entity.transform.z], backend: window.__strata.device.info.backend }; });
+const dbg = await p.evaluate((hide) => { const g = window.__strata.game; g.hud.showDebug = !hide; g.hud.hidden = hide; return { fps: g.fps, chunks: g.level.chunks.size, meshes: g.meshes.meshes.size, vis: g.renderer.stats.visibleSections, draws: g.renderer.stats.drawCalls, pos: [g.player.entity.transform.x, g.player.entity.transform.y, g.player.entity.transform.z], backend: window.__strata.device.info.backend }; }, !!process.env.NOHUD);
 console.log(JSON.stringify(dbg));
 await p.waitForTimeout(300);
 await p.screenshot({ path: out });

@@ -9,6 +9,7 @@ import { EntityMesh, TEX_SKIN } from './mesh';
 import { EntityTextures, ENTITY_TEX } from './textures';
 import { ItemModels, emitItem } from './itemmodel';
 import { ENTITY_RENDERERS, RenderContext, renderHumanoid } from './renderers';
+import './mobs/index';
 import { createPlayerModel } from './player';
 import type { WorldRenderer, Camera, WorldLayer } from '../renderer';
 import type { ClientLevel } from '../../world';

@@ -106,11 +106,15 @@ export class ClientFx {
         if (stack && !stack.isEmpty()) P.itemDebris(t.x, t.y + h * 0.8, t.z, this.itemLayer(stack.id), 5, 0.15);
         break;
       }
-      case 'death':
-        if (e && !e.player) {
-          // Poof when the corpse disappears (reference ~20 ticks)
-          setTimeout(() => { for (let i = 0; i < 20; i++) P.spawn('poof', t.x, t.y + h * 0.5, t.z, 0.3, h * 0.3, 0.3, 0.02, 1); }, 1000);
-        }
+      case 'poof':
+        // The corpse disappears (sent by the server just before removal)
+        for (let i = 0; i < 20; i++) P.spawn('poof', t.x, t.y + h * 0.5, t.z, 0.3, h * 0.3, 0.3, 0.02, 1);
+        break;
+      case 'love':
+        for (let i = 0; i < 7; i++) P.spawn('heart', t.x + (this.rng.nextFloat() - 0.5) * (e?.physics.width ?? 0.6) * 2, t.y + 0.5 + this.rng.nextFloat() * h, t.z + (this.rng.nextFloat() - 0.5) * (e?.physics.width ?? 0.6) * 2, 0, 0, 0, 0, 0);
+        break;
+      case 'villagerHappy':
+        for (let i = 0; i < 7; i++) P.spawn('happy_villager', t.x + (this.rng.nextFloat() - 0.5) * 1.2, t.y + 0.5 + this.rng.nextFloat() * h, t.z + (this.rng.nextFloat() - 0.5) * 1.2, 0.02, 0.02, 0.02, 0.02, 1);
         break;
     }
   }

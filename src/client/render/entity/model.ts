@@ -17,6 +17,8 @@ export class ModelPart {
   /** Pivot relative to the parent (pixels). */
   x = 0; y = 0; z = 0;
   xRot = 0; yRot = 0; zRot = 0;
+  /** Uniform scale around the pivot (baby heads, breathing). */
+  scale = 1;
   visible = true;
   readonly cubes: Cube[] = [];
   readonly children = new Map<string, ModelPart>();
@@ -54,6 +56,7 @@ export class ModelPart {
   reset(): void {
     [this.x, this.y, this.z, this.xRot, this.yRot, this.zRot] = this.base as [number, number, number, number, number, number];
     this.visible = true;
+    this.scale = 1;
     for (const c of this.children.values()) c.reset();
   }
 
@@ -65,6 +68,7 @@ export class ModelPart {
     if (this.zRot) mesh.rotate(2, this.zRot);
     if (this.yRot) mesh.rotate(1, this.yRot);
     if (this.xRot) mesh.rotate(0, this.xRot);
+    if (this.scale !== 1) mesh.scale(this.scale);
     for (const c of this.cubes) emitCube(mesh, c, texSize);
     for (const ch of this.children.values()) ch.render(mesh, texSize);
     mesh.pop();
@@ -76,6 +80,7 @@ export class ModelPart {
     if (this.zRot) mesh.rotate(2, this.zRot);
     if (this.yRot) mesh.rotate(1, this.yRot);
     if (this.xRot) mesh.rotate(0, this.xRot);
+    if (this.scale !== 1) mesh.scale(this.scale);
   }
 }
 

@@ -2,7 +2,7 @@
  * Display names for blocks and items. English names are derived from ids; Spanish names are built
  * by a rule-based translator (noun-first order, gender agreement for colours and materials).
  */
-import { getLang, registerKeyFallback } from '../../common/lang/i18n';
+import { getLang, registerKeyFallback, t } from '../../common/lang/i18n';
 
 const EN_OVERRIDES: Record<string, string> = {
   tnt: 'TNT', flux_dust: 'Flux Dust', void_eye: 'Void Eye', infernium_ingot: 'Infernium Ingot',
@@ -161,6 +161,10 @@ export function itemName(id: string): string {
   const lang = getLang();
   const explicit = extraNames[lang][id];
   if (explicit) return explicit;
+  if (id.endsWith('_spawn_egg')) {
+    const mob = t(`entity.${id.slice(0, -'_spawn_egg'.length)}`);
+    return lang === 'es' ? `Huevo generador de ${mob.toLowerCase()}` : `${mob} Spawn Egg`;
+  }
   return lang === 'es' ? spanishName(id) : englishName(id);
 }
 
