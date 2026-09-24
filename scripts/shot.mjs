@@ -12,16 +12,16 @@ p.on('pageerror', (e) => logs.push('[pageerror] ' + e.message + '\n' + e.stack))
 await p.goto(url + '?gfx=' + gfx);
 await p.waitForFunction(() => window.__strata && window.__strata.device, null, { timeout: 60000 });
 const t0 = Date.now();
-await p.evaluate(async (wt) => {
+await p.evaluate(async ([wt, MODE]) => {
   const app = window.__strata;
   const info = {
-    name: 'Test', seed: '12345', generator: { type: wt, structures: true, bonusChest: false }, gameMode: 'creative', difficulty: 2, hardcore: false, allowCommands: true,
+    name: 'Test', seed: '12345', generator: { type: wt, structures: true, bonusChest: false }, gameMode: MODE, difficulty: 2, hardcore: false, allowCommands: true,
     spawn: { x: 0, y: 80, z: 0 }, gameTime: 0, dayTime: 3000, weather: { raining: false, thundering: false, rainTime: 0, thunderTime: 0, clearTime: 0, rainLevel: 0, thunderLevel: 0 },
     rules: {}, version: 1, created: Date.now(), lastPlayed: Date.now(), data: {},
   };
   app.settings.renderDistance = 6;
   await app.startWorld('test', info, false);
-}, worldType);
+}, [worldType, process.env.MODE ?? 'creative']);
 await p.waitForFunction(() => window.__strata.game && window.__strata.game.loaded, null, { timeout: 120000 });
 console.log('loaded in', Date.now() - t0, 'ms');
 if (extra) await p.evaluate(extra);
@@ -30,5 +30,6 @@ const dbg = await p.evaluate(() => { const g = window.__strata.game; g.hud.showD
 console.log(JSON.stringify(dbg));
 await p.waitForTimeout(300);
 await p.screenshot({ path: out });
+if (process.env.CLIP) { const [x, y, width, height] = process.env.CLIP.split(',').map(Number); await p.screenshot({ path: out.replace(/\.png$/, '-clip.png'), clip: { x, y, width, height } }); }
 console.log(logs.slice(0, 30).join('\n'));
 await b.close();

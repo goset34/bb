@@ -17,6 +17,7 @@ import { ItemStack } from '../common/item/stack';
 import { BlockPlaceContext } from '../common/world/placecontext';
 import { AABB } from '../common/math/geom';
 import { ticksToBreak } from '../common/item/mining';
+import { PlayerMenus } from './menus';
 
 interface InputPacket {
   seq: number;
@@ -64,6 +65,8 @@ export class ServerPlayer {
   disconnected = false;
   /** Load progress reporting during spawn. */
   private spawnChunksReported = false;
+  /** Inventory menu (window 0) and the open container menu. */
+  readonly menus: PlayerMenus;
 
   constructor(readonly server: StrataServer, readonly conn: Connection, readonly name: string, readonly uuid: string) {
     const player: PlayerData = { name, gameMode: 'survival', abilities: abilitiesFor('survival'), inventory: new Inventory(), lastInputSeq: 0 };
@@ -75,6 +78,7 @@ export class ServerPlayer {
       player,
       meta: {},
     } as PlayerEntity;
+    this.menus = new PlayerMenus(this);
     conn.onPacket((p) => {
       try {
         this.handle(p);
@@ -141,8 +145,9 @@ export class ServerPlayer {
     this.send({ type: 'playerPosition', x, y, z, yaw, pitch, vx: 0, vy: 0, vz: 0, teleportId: this.awaitingTeleport });
   }
 
+  /** Full resync of the inventory menu (window 0) and the selected hotbar slot. */
   syncInventory(): void {
-    this.send({ type: 'containerContent', windowId: 0, stateId: this.inventory.revision, slots: this.inventory.slots, carried: ItemStack.empty() });
+    this.menus.fullSync(this.menus.inventory);
     this.send({ type: 'setCarried', slot: this.inventory.selected });
   }
 
@@ -151,6 +156,7 @@ export class ServerPlayer {
   // ===========================================================================================
 
   private handle(p: Packet): void {
+    if (this.menus.handle(p)) return;
     switch (p.type) {
       case 'input': {
         if (this.inputQueue.length < 40) this.inputQueue.push(p as unknown as InputPacket);
@@ -180,19 +186,18 @@ export class ServerPlayer {
       case 'useItemOn':
         this.handleUseItemOn(p);
         break;
+      case 'useItem': {
+        if (this.data.gameMode === 'spectator' || this.entity.living?.dead) break;
+        const hand = (p['hand'] as string) === 'off' ? 'off' : 'main';
+        this.server.hooks.useItem(this, hand);
+        break;
+      }
       case 'abilities':
         if (this.data.abilities.mayFly) {
           this.data.abilities.flying = !!p['flying'];
           this.entity.input.flying = this.data.abilities.flying;
         }
         break;
-      case 'creativeSlot': {
-        if (this.data.gameMode !== 'creative') break;
-        const slot = p['slot'] as number;
-        const stack = p['stack'] as ItemStack;
-        if (slot >= 0 && slot < this.inventory.slots.length) this.inventory.set(slot, stack);
-        break;
-      }
       case 'pickBlock': {
         if (this.data.gameMode !== 'creative') break;
         const s = this.level.getBlockState(p['x'] as number, p['y'] as number, p['z'] as number);
@@ -420,9 +425,10 @@ export class ServerPlayer {
     }
     // 2. Item use on block (hoes, buckets, flint & steel…)
     if (this.server.hooks.useItemOn(this, hand, stack, x, y, z, face, hx, hy, hz)) return;
-    // 3. Block placement
+    // 3. Block placement (items that place nothing are used as if clicked in the air)
     const block = blockForItem(stack.id);
     if (!block || stack.isEmpty()) {
+      if (!stack.isEmpty()) this.server.hooks.useItem(this, hand);
       this.resync(x, y, z);
       return;
     }
@@ -524,6 +530,7 @@ export class ServerPlayer {
 
   /** Called every tick by the server. */
   tick(): void {
+    this.menus.broadcastChanges();
     const now = this.server.gameTime;
     if (now - this.lastKeepAlive > 300) {
       if (this.keepAlivePending && !this.server.singleplayer) {

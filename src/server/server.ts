@@ -87,6 +87,9 @@ export class GameRules {
 /** Extension points filled by later systems (entities, loot, survival, redstone…). */
 export interface ServerHooks {
   dropBlockLoot(level: ServerLevel, x: number, y: number, z: number, state: number, breaker: Entity | null, tool: ItemStack | null): void;
+  hurtEntity(level: ServerLevel, e: Entity, type: string, amount: number, attacker: Entity | null): boolean;
+  igniteEntity(level: ServerLevel, e: Entity, seconds: number): void;
+  addEntityEffect(level: ServerLevel, e: Entity, id: string, ticks: number, amp: number): void;
   spawnItem(level: ServerLevel, x: number, y: number, z: number, stack: ItemStack, vx?: number, vy?: number, vz?: number, pickupDelay?: number): Entity | null;
   spawnExperience(level: ServerLevel, x: number, y: number, z: number, amount: number): void;
   createEntity(level: ServerLevel, type: string, x: number, y: number, z: number, opts: Record<string, unknown>): Entity | null;
@@ -116,6 +119,8 @@ export interface ServerHooks {
   beforeBreak(p: ServerPlayer, x: number, y: number, z: number, state: number): boolean;
   afterBreak(p: ServerPlayer, x: number, y: number, z: number, state: number): void;
   useItemOn(p: ServerPlayer, hand: 'main' | 'off', stack: ItemStack, x: number, y: number, z: number, face: Direction, hx: number, hy: number, hz: number): boolean;
+  /** Item used without a block target (food, buckets, armor, projectiles…). */
+  useItem(p: ServerPlayer, hand: 'main' | 'off'): boolean;
   blocksPlacement(e: Entity): boolean;
   blockPlaced(p: ServerPlayer, x: number, y: number, z: number, state: number, stack: ItemStack, hand: 'main' | 'off'): void;
   swing(p: ServerPlayer, hand: 'main' | 'off'): void;
@@ -126,11 +131,18 @@ export interface ServerHooks {
   serverTick(): void;
   savePlayer(p: ServerPlayer): Record<string, unknown>;
   loadPlayer(p: ServerPlayer, data: Record<string, unknown>): void;
+  /** A player throws/drops a stack (menus, Q key, death). */
+  playerDrop(p: ServerPlayer, stack: ItemStack, randomly: boolean): void;
+  /** Items were crafted from a result slot (stats, recipe unlocks). */
+  itemCrafted(p: ServerPlayer, stack: ItemStack, amount: number): void;
 }
 
 function defaultHooks(server: StrataServer): ServerHooks {
   return {
     dropBlockLoot() {},
+    hurtEntity: () => false,
+    igniteEntity() {},
+    addEntityEffect() {},
     spawnItem: () => null,
     spawnExperience() {},
     createEntity: () => null,
@@ -162,6 +174,7 @@ function defaultHooks(server: StrataServer): ServerHooks {
     beforeBreak: () => true,
     afterBreak() {},
     useItemOn: () => false,
+    useItem: () => false,
     blocksPlacement: (e) => e.type !== 'item' && e.type !== 'xp_orb',
     blockPlaced() {},
     swing() {},
@@ -172,6 +185,12 @@ function defaultHooks(server: StrataServer): ServerHooks {
     serverTick() {},
     savePlayer: () => ({}),
     loadPlayer() {},
+    playerDrop(p, stack) {
+      const t = p.entity.transform;
+      const yaw = (t.yaw * Math.PI) / 180, pitch = (t.pitch * Math.PI) / 180;
+      p.level.spawnItem(t.x, t.y + p.entity.physics.eyeHeight - 0.3, t.z, stack, -Math.sin(yaw) * Math.cos(pitch) * 0.3, -Math.sin(pitch) * 0.3 + 0.1, Math.cos(yaw) * Math.cos(pitch) * 0.3, 40);
+    },
+    itemCrafted() {},
   };
 }
 
@@ -295,7 +314,17 @@ export class StrataServer {
     player.entity.transform.x = spawn.x + 0.5;
     player.entity.transform.y = spawn.y;
     player.entity.transform.z = spawn.z + 0.5;
-    if (saved) this.hooks.loadPlayer(player, saved);
+    if (saved) {
+      const pos = saved['pos'] as number[] | undefined;
+      const rot = saved['rot'] as number[] | undefined;
+      const t = player.entity.transform;
+      if (pos) { t.x = pos[0]!; t.y = pos[1]!; t.z = pos[2]!; }
+      if (rot) { t.yaw = rot[0]!; t.pitch = rot[1]!; }
+      if (typeof saved['gameMode'] === 'string') player.data.gameMode = saved['gameMode'] as GameMode;
+      if (saved['inventory']) player.inventory.load(saved['inventory'] as Parameters<typeof player.inventory.load>[0]);
+      if (saved['flying'] === true) player.data.abilities.flying = true;
+      this.hooks.loadPlayer(player, saved);
+    }
     player.send({
       type: 'login', entityId: player.entity.id, name: player.name, dim: level.dimId, gameMode: player.data.gameMode,
       hardcore: this.info.hardcore, difficulty: this.info.difficulty, viewDistance: player.viewDistance,

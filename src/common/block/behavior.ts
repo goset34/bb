@@ -46,6 +46,19 @@ export class BlockBehavior {
 
   randomTick(_state: number, _level: LevelAccess, _x: number, _y: number, _z: number, _rng: Random): void {}
 
+  /** Bone meal: can this block be fertilised here? */
+  isBonemealTarget(_state: number, _level: LevelAccess, _x: number, _y: number, _z: number): boolean {
+    return false;
+  }
+
+  /** Bone meal: apply one use (called after the item was consumed and a random check passed). */
+  performBonemeal(_state: number, _level: LevelAccess, _x: number, _y: number, _z: number, _rng: Random): void {}
+
+  /** Bone meal success chance for one use (saplings are 45%). */
+  bonemealChance(_state: number): number {
+    return 1;
+  }
+
   /** Scheduled tick. */
   tick(_state: number, _level: LevelAccess, _x: number, _y: number, _z: number, _rng: Random): void {}
 

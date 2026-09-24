@@ -301,6 +301,7 @@ export class App implements ScreenHost {
         this.show(messageScreen(t('disconnect.lost'), reason, () => this.showTitle()));
       },
       onPause: () => this.pause(),
+      onQuit: () => void this.saveAndQuit(),
     });
     this.world = { id, server, gens, game };
     const progressTimer = setInterval(() => load.set(t('menu.preparingSpawn', Math.round(game.loadProgress * 100)), game.loadProgress), 100);

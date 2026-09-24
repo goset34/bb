@@ -301,6 +301,22 @@ export function setValue<T extends PropValue>(state: number, p: Property<T>, v: 
   return withIndex(state, p, p.indexOf(v));
 }
 
+/**
+ * Same property values on another block (log → stripped log keeps its axis, copper stairs keep
+ * facing/half/shape when waxed…). Properties missing on the target are ignored.
+ */
+export function transferState(state: number, target: Block): number {
+  const src = BLOCKS[stateBlock[state]!]!;
+  let out = target.defaultState;
+  for (const p of src.props) {
+    const tp = target.props.find((q) => q.name === p.name);
+    if (!tp) continue;
+    const idx = (tp.values as readonly PropValue[]).indexOf(getValue(state, p));
+    if (idx >= 0) out = withIndex(out, tp, idx);
+  }
+  return out;
+}
+
 /** Cycle to the next value of a property. */
 export function cycle(state: number, p: Property): number {
   const i = getIndex(state, p);

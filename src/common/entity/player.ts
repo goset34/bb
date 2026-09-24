@@ -66,6 +66,61 @@ export class Inventory {
     return this.get(INV_ARMOR + idx);
   }
 
+  /**
+   * Insert a stack (hotbar first, then main inventory): merges into matching stacks, then
+   * fills empty slots. `stack.count` is reduced by what was added; returns true if fully added.
+   */
+  add(stack: ItemStack, maxStack: number): boolean {
+    if (stack.isEmpty()) return true;
+    const order: number[] = [];
+    for (let i = 0; i < INV_ARMOR; i++) order.push(i);
+    for (const i of order) {
+      const s = this.slots[i]!;
+      if (s.isEmpty() || !s.sameItemSameData(stack) || s.count >= maxStack) continue;
+      const n = Math.min(maxStack - s.count, stack.count);
+      s.count += n;
+      stack.count -= n;
+      this.revision++;
+      if (stack.count <= 0) return true;
+    }
+    for (const i of order) {
+      if (!this.slots[i]!.isEmpty()) continue;
+      const n = Math.min(maxStack, stack.count);
+      this.slots[i] = stack.copyWithCount(n);
+      stack.count -= n;
+      this.revision++;
+      if (stack.count <= 0) return true;
+    }
+    return false;
+  }
+
+  /** Count of an item across the inventory. */
+  count(id: string): number {
+    let n = 0;
+    for (const s of this.slots) if (s.id === id) n += s.count;
+    return n;
+  }
+
+  /** Remove up to `n` items of `id`; returns the number removed. */
+  remove(id: string, n: number): number {
+    let left = n;
+    for (let i = 0; i < this.slots.length && left > 0; i++) {
+      const s = this.slots[i]!;
+      if (s.id !== id || s.isEmpty()) continue;
+      const k = Math.min(left, s.count);
+      s.count -= k;
+      left -= k;
+      if (s.isEmpty()) this.slots[i] = ItemStack.empty();
+    }
+    if (left !== n) this.revision++;
+    return n - left;
+  }
+
+  clear(): void {
+    for (let i = 0; i < this.slots.length; i++) this.slots[i] = ItemStack.empty();
+    this.revision++;
+  }
+
   toJSON() {
     return { selected: this.selected, slots: this.slots.map((s) => (s.isEmpty() ? null : s.toJSON())) };
   }

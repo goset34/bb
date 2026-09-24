@@ -13,6 +13,8 @@ import { P } from '../common/block/properties';
 import { Direction, DIRS, DX, DY, DZ, OPPOSITE, chunkKey } from '../common/world/direction';
 import { Random, WorldSeed } from '../common/math/random';
 import { EntityWorld, Entity } from '../common/entity/ecs';
+import { EntityTracker } from './entity/tracker';
+import type { WorldAccess } from '../common/worldgen/features/api';
 import { LightEngine } from '../common/world/light';
 import { ChunkManager, ChunkStore, Holder, Ticket } from './chunkmanager';
 import { GenService } from './gen';
@@ -41,6 +43,7 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
   readonly chunks: ChunkManager;
   readonly light: LightEngine;
   readonly entities = new EntityWorld();
+  readonly tracker: EntityTracker;
   readonly players: ServerPlayer[] = [];
   readonly blockTicks = new TickQueue();
   readonly fluidTicks = new TickQueue();
@@ -67,6 +70,7 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
     gen: GenService,
     store: ChunkStore,
   ) {
+    this.tracker = new EntityTracker(this);
     this.dim = DIMENSIONS[dimId];
     this.minY = this.dim.minY;
     this.maxY = this.dim.minY + this.dim.height;
@@ -483,6 +487,11 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
     for (const p of this.players) p.send(packet);
   }
 
+  /** Entity event (hurt flash, death, totem…) to everyone tracking the entity. */
+  broadcastEntityEvent(e: Entity, event: string, data: number): void {
+    this.tracker.broadcast(e, { type: 'entityEvent', id: e.id, event, data });
+  }
+
   // =============================================================================================
   // Entities
   // =============================================================================================
@@ -525,6 +534,61 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
 
   explode(source: Entity | null, x: number, y: number, z: number, power: number, fire: boolean, mode: 'none' | 'block' | 'mob' | 'tnt' | 'trigger'): void {
     this.server.hooks.explode(this, source, x, y, z, power, fire, mode);
+  }
+
+  hurtEntity(e: Entity, type: string, amount: number, attacker?: Entity | null): boolean {
+    return this.server.hooks.hurtEntity(this, e, type, amount, attacker ?? null);
+  }
+
+  igniteEntity(e: Entity, seconds: number): void {
+    this.server.hooks.igniteEntity(this, e, seconds);
+  }
+
+  addEntityEffect(e: Entity, id: string, ticks: number, amp: number): void {
+    this.server.hooks.addEntityEffect(this, e, id, ticks, amp);
+  }
+
+  dropBlockLoot(x: number, y: number, z: number, state: number, breaker?: Entity | null, tool?: ItemStack | null): void {
+    this.server.hooks.dropBlockLoot(this, x, y, z, state, breaker ?? null, tool ?? null);
+  }
+
+  openMenu(player: Entity, kind: string, x: number, y: number, z: number): void {
+    const p = this.players.find((pl) => pl.entity === player);
+    p?.menus.openMenu(kind, { x, y, z });
+  }
+
+  /** Run a feature against the live world; writes notify clients and neighbours. */
+  placeFeature(run: (world: WorldAccess, rng: Random) => boolean): boolean {
+    const level = this;
+    const world: WorldAccess = {
+      minY: this.minY,
+      maxY: this.maxY,
+      getBlock: (x, y, z) => level.getBlockState(x, y, z),
+      setBlock: (x, y, z, st) => { level.setBlock(x, y, z, st, 3); },
+      getHeight: (kind, x, z) => {
+        if (kind === 'ocean_floor') {
+          let y = level.getHeight('motion', x, z) - 1;
+          while (y > level.minY) {
+            const f = stateFlags[level.getBlockState(x, y, z)]!;
+            if (!(f & F.NO_COLLISION) && !(f & F.FLUID_BLOCK)) break;
+            y--;
+          }
+          return y + 1;
+        }
+        return level.getHeight(kind, x, z);
+      },
+      getBiome: (x, y, z) => level.getBiome(x, y, z),
+      setBlockEntity: (x, y, z, type, data) => level.setBlockEntity({ type, x, y, z, data }),
+      isInside: (x, z) => level.isLoaded(x, z),
+      scheduleTick: (x, y, z, delay) => {
+        const st = level.getBlockState(x, y, z);
+        const f = stateFlags[st]!;
+        if (f & F.FLUID_BLOCK) level.scheduleFluidTick(x, y, z, f & F.LAVA ? 'lava' : 'water', delay);
+        else level.scheduleTick(x, y, z, blockOf(st), delay);
+      },
+      addEntity: (type, x, y, z, data) => { level.createEntity(type, x, y, z, data ?? {}); },
+    };
+    return run(world, this.random);
   }
 
   getDifficulty(): number {
@@ -629,7 +693,10 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
       if (this.light.hasPending) this.light.run();
       this.light.flushChanged();
     });
-    time('sync', () => this.flushChanges());
+    time('sync', () => {
+      this.flushChanges();
+      this.tracker.tick();
+    });
   }
 
   private runScheduledTicks(): void {

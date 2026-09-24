@@ -7,6 +7,9 @@ import { registerRecipes } from './recipe/data';
 import { registerChestLoot } from './loot/chests';
 import './loot/blocks';
 import { attachBehaviors } from './block/behaviors/index';
+import { registerGrowthBehaviors, wrapGrowthBehaviors } from './block/behaviors/growth';
+import { registerStationBehaviors } from './block/behaviors/stations';
+import { registerEffects } from './effect/effects';
 import { hashString } from './math/random';
 
 let initialised = false;
@@ -18,7 +21,11 @@ export function initRegistries(pre?: StateTables): void {
   registerBlockItems();
   registerItems();
   assignBlockItemProperties((name) => getBlock(name).settings.tags ?? []);
+  registerGrowthBehaviors();
+  registerStationBehaviors();
   attachBehaviors();
+  wrapGrowthBehaviors();
+  registerEffects();
   registerRecipes();
   registerChestLoot();
 }

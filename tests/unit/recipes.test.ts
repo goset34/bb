@@ -64,8 +64,8 @@ describe('Recipes', () => {
     expect(opts).toContain('stone_brick_stairs');
     const up = findSmithing(new ItemStack('infernium_upgrade_smithing_template', 1), new ItemStack('diamond_sword', 1), new ItemStack('infernium_ingot', 1))!;
     expect(up.result.id).toBe('infernium_sword');
-    const trim = findSmithing(new ItemStack('coast_armor_trim_smithing_template', 1), new ItemStack('iron_chestplate', 1), new ItemStack('emerald', 1))!;
-    expect(trim.result.data.trim).toEqual({ pattern: 'coast', material: 'emerald' });
+    const trim = findSmithing(new ItemStack('shoreline_armor_trim_smithing_template', 1), new ItemStack('iron_chestplate', 1), new ItemStack('emerald', 1))!;
+    expect(trim.result.data.trim).toEqual({ pattern: 'shoreline', material: 'emerald' });
   });
 });
 

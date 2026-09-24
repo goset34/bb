@@ -24,8 +24,23 @@ export function has(key: string, lang: Lang = current): boolean {
   return key in TABLES[lang] || key in extra[lang];
 }
 
+/** Resolvers for generated keys (item.<id>, entity.<type>) registered by the client. */
+const fallbacks: Array<(key: string) => string | null> = [];
+
+export function registerKeyFallback(fn: (key: string) => string | null): void {
+  fallbacks.push(fn);
+}
+
+function fallback(key: string): string {
+  for (const f of fallbacks) {
+    const v = f(key);
+    if (v !== null) return v;
+  }
+  return key;
+}
+
 export function t(key: string, ...args: Array<string | number>): string {
-  const s = TABLES[current][key] ?? extra[current][key] ?? TABLES.en[key] ?? extra.en[key] ?? key;
+  const s = TABLES[current][key] ?? extra[current][key] ?? TABLES.en[key] ?? extra.en[key] ?? fallback(key);
   if (!args.length) return s;
   let i = 0;
   return s.replace(/%(\d+\$)?[sd]/g, (m, pos: string | undefined) => {

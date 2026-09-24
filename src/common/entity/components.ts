@@ -4,6 +4,7 @@
  */
 import type { ItemStack } from '../item/stack';
 import type { PlayerData } from './player';
+import type { Attributes, EffectInstance, FoodData, Experience } from './living';
 
 export interface Transform {
   x: number;
@@ -136,25 +137,57 @@ export interface NetSync {
   metaDirty: boolean;
 }
 
-/** Client-side interpolation state. */
+/** Client-side interpolation and animation state. */
 export interface ClientInterp {
-  /** Snapshot buffer (server tick, x, y, z, yaw, pitch, headYaw). */
-  snaps: Array<{ t: number; x: number; y: number; z: number; yaw: number; pitch: number; headYaw: number }>;
-  /** Animation state */
+  /** Latest server position/rotation; the entity moves 1/steps of the way each tick. */
+  tx: number;
+  ty: number;
+  tz: number;
+  tyaw: number;
+  tpitch: number;
+  theadYaw: number;
+  steps: number;
+  /** Walk animation. */
   limbSwing: number;
   limbSwingAmount: number;
   prevLimbSwingAmount: number;
-  swingProgress: number;
-  prevSwingProgress: number;
-  swinging: boolean;
+  /** Arm swing (0..1 progress over 6 ticks). */
   swingTime: number;
+  swinging: boolean;
+  swingOffhand: boolean;
   hurtTime: number;
   deathTime: number;
   age: number;
+  /** Visible equipment: main hand, off hand, feet, legs, chest, head. */
+  equipment: ItemStack[];
+  effects: Array<{ id: string; amp: number; dur: number; particles: boolean; ambient: boolean }>;
+  /** Pickup animation towards a collector. */
+  pickup: { collector: number; t: number; x: number; y: number; z: number } | null;
 }
 
 /** Generic per-type metadata synchronised to clients (colors, variants, flags…). */
 export type Meta = Record<string, number | string | boolean>;
+
+/** Health, effects and attributes of living entities (players and mobs). */
+export interface LivingComp {
+  health: number;
+  absorption: number;
+  attrs: Attributes;
+  effects: Map<string, EffectInstance>;
+  /** Red flash ticks (10 → 0). */
+  hurtTime: number;
+  /** Invulnerability ticks after being hurt (20 → 0). */
+  invulnerable: number;
+  /** Damage of the last hit inside the invulnerability window. */
+  lastHurt: number;
+  deathTime: number;
+  dead: boolean;
+  lastAttacker: number;
+  lastAttackerTick: number;
+  undead: boolean;
+  /** Equipment snapshot key used to refresh attribute modifiers. */
+  equipKey: string;
+}
 
 export interface Components {
   transform: Transform;
@@ -166,6 +199,9 @@ export interface Components {
   interp: ClientInterp;
   meta: Meta;
   player: PlayerData;
+  living: LivingComp;
+  food: FoodData;
+  xp: Experience;
   /** Arbitrary extension components registered by later systems. */
   [key: string]: unknown;
 }

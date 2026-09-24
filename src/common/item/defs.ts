@@ -58,12 +58,11 @@ export const MUSIC_DISCS: Array<{ id: string; minutes: number; comparator: numbe
 ];
 
 export const SHERDS = [
-  'angler', 'archer', 'arms_up', 'blade', 'brewer', 'burn', 'danger', 'explorer', 'flow', 'friend', 'guster', 'heart', 'heartbreak',
-  'howl', 'miner', 'mourner', 'plenty', 'prize', 'scrape', 'sheaf', 'shelter', 'skull', 'snort',
+  'fisher', 'bowman', 'rejoice', 'edge', 'alchemist', 'scorch', 'peril', 'wanderer', 'swirl', 'companion', 'gale', 'kinship', 'sorrow', 'baying', 'delver', 'lament', 'harvest', 'trophy', 'scuff', 'stook', 'haven', 'cranium', 'grunt',
 ];
 
 export const TRIM_PATTERNS = [
-  'sentry', 'dune', 'coast', 'wild', 'ward', 'eye', 'vex', 'tide', 'snout', 'rib', 'spire', 'wayfinder', 'shaper', 'silence', 'raiser', 'host', 'flow', 'bolt',
+  'watchman', 'dunes', 'shoreline', 'thicket', 'bulwark', 'gaze', 'wisp', 'undertow', 'muzzle', 'ribcage', 'pinnacle', 'pathfinder', 'molder', 'hush', 'hoister', 'hearth', 'eddy', 'rivet',
 ];
 
 export const WOODS_FOR_BOATS = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry', 'pale_oak'];
@@ -165,7 +164,7 @@ export function registerItems(): void {
     'coal', 'charcoal', 'diamond', 'emerald', 'lapis_lazuli', 'cinder_quartz', 'amethyst_shard', 'iron_ingot', 'gold_ingot', 'copper_ingot',
     'infernium_ingot', 'infernium_scrap', 'raw_iron', 'raw_gold', 'raw_copper', 'iron_nugget', 'gold_nugget', 'copper_nugget', 'stick', 'bowl',
     'string', 'feather', 'gunpowder', 'flint', 'leather', 'rabbit_hide', 'turtle_scute', 'armadillo_scute', 'bone', 'bone_meal', 'blaze_rod', 'blaze_powder',
-    'breeze_rod', 'ghast_tear', 'magma_cream', 'slime_ball', 'glowstone_dust', 'flux_dust', 'sugar', 'paper', 'book', 'clay_ball', 'brick', 'cinder_brick',
+    'gust_rod', 'ghast_tear', 'magma_cream', 'slime_ball', 'glowstone_dust', 'flux_dust', 'sugar', 'paper', 'book', 'clay_ball', 'brick', 'cinder_brick',
     'prismarine_shard', 'prismarine_crystals', 'nautilus_shell', 'heart_of_the_sea', 'echo_shard', 'disc_fragment', 'phantom_membrane', 'popped_chorus_fruit',
     'lurker_shell', 'blight_star', 'dragon_breath', 'honeycomb', 'ink_sac', 'glow_ink_sac', 'wheat', 'wheat_seeds', 'beetroot_seeds', 'melon_seeds',
     'pumpkin_seeds', 'torchflower_seeds', 'pitcher_pod', 'cocoa_beans', 'glistering_melon_slice', 'fermented_spider_eye', 'rabbit_foot', 'resin_clump',

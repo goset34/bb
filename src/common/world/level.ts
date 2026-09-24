@@ -2,6 +2,7 @@
  * World access interface shared by block behaviours, physics and AI.
  * Implemented by ServerLevel (authoritative) and ClientLevel (prediction/rendering).
  */
+import type { WorldAccess } from '../worldgen/features/api';
 import type { Block } from '../block/registry';
 import type { Direction } from './direction';
 import type { Random } from '../math/random';
@@ -96,7 +97,22 @@ export interface LevelAccess extends BlockGetter {
   explode(source: Entity | null, x: number, y: number, z: number, power: number, fire: boolean, mode: 'none' | 'block' | 'mob' | 'tnt' | 'trigger'): void;
   getDifficulty(): number;
   getGameRule(name: string): boolean | number;
+
+  // Server-side effects (no-ops during client prediction)
+  /** Damage a living entity; returns true if damage was applied. */
+  hurtEntity(e: Entity, type: string, amount: number, attacker?: Entity | null): boolean;
+  /** Set an entity on fire for `seconds` (fire resistance / immunity respected). */
+  igniteEntity(e: Entity, seconds: number): void;
+  /** Give a living entity a status effect. */
+  addEntityEffect(e: Entity, id: string, ticks: number, amp: number): void;
+  /** Run a world-generation feature against the live world (trees from saplings…). */
+  placeFeature(run: (world: WorldAccess, rng: Random) => boolean): boolean;
+  /** Drop a block's loot as items (as if broken by `tool`). */
+  dropBlockLoot(x: number, y: number, z: number, state: number, breaker?: Entity | null, tool?: ItemStack | null): void;
+  /** Open a block menu (crafting table, furnace, chest…) for a player. */
+  openMenu(player: Entity, kind: string, x: number, y: number, z: number): void;
 }
+
 
 /** Context passed to getStateForPlacement. */
 export interface PlaceContext {

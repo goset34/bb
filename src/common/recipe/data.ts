@@ -312,8 +312,8 @@ function toolRecipes(): void {
   shaped('clock', 1, [' # ', '#X#', ' # '], { '#': 'gold_ingot', X: 'flux_dust' }, 'equipment');
   shaped('recovery_compass', 1, ['SSS', 'SCS', 'SSS'], { S: 'echo_shard', C: 'compass' }, 'equipment');
   shaped('lead', 2, ['~~ ', '~O ', '  ~'], { '~': 'string', O: 'slime_ball' }, 'equipment');
-  shaped('mace', 1, [' H ', ' R '], { H: 'heavy_core', R: 'breeze_rod' }, 'equipment');
-  shapeless('wind_charge', 4, ['breeze_rod'], 'equipment');
+  shaped('mace', 1, [' H ', ' R '], { H: 'heavy_core', R: 'gust_rod' }, 'equipment');
+  shapeless('wind_charge', 4, ['gust_rod'], 'equipment');
   shaped('bundle', 1, ['S', 'L'], { S: 'string', L: 'leather' }, 'equipment');
   shaped('saddle', 1, [' X ', 'X#X'], { X: 'leather', '#': 'iron_ingot' }, 'equipment');
   shaped('name_tag', 1, [' I', 'P '], { I: 'iron_nugget', P: 'paper' }, 'equipment');
@@ -496,9 +496,7 @@ function smithingRecipes(): void {
   }
   // Template duplication
   const dupBase: Record<string, string> = {
-    sentry: 'cobblestone', dune: 'sandstone', coast: 'cobblestone', wild: 'mossy_cobblestone', ward: 'cobbled_deepslate', eye: 'verge_stone', vex: 'cobblestone',
-    tide: 'prismarine', snout: 'blackstone', rib: 'cinderrack', spire: 'purpur_block', wayfinder: 'terracotta', shaper: 'terracotta', silence: 'cobbled_deepslate',
-    raiser: 'terracotta', host: 'terracotta', flow: 'breeze_rod', bolt: 'copper_block',
+    watchman: 'cobblestone', dunes: 'sandstone', shoreline: 'cobblestone', thicket: 'mossy_cobblestone', bulwark: 'cobbled_deepslate', gaze: 'verge_stone', wisp: 'cobblestone', undertow: 'prismarine', muzzle: 'blackstone', ribcage: 'cinderrack', pinnacle: 'purpur_block', pathfinder: 'terracotta', molder: 'terracotta', hush: 'cobbled_deepslate', hoister: 'terracotta', hearth: 'terracotta', eddy: 'gust_rod', rivet: 'copper_block',
   };
   for (const p of TRIM_PATTERNS) {
     shaped(`${p}_armor_trim_smithing_template`, 2, ['#S#', '#C#', '###'], { '#': 'diamond', S: `${p}_armor_trim_smithing_template`, C: dupBase[p] ?? 'cobblestone' }, 'misc', { id: `${p}_template_copy` });

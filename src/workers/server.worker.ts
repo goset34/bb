@@ -10,6 +10,7 @@ import { PortGenPool } from '../server/gen';
 import { Connection, portTransport } from '../common/net/connection';
 import type { StateTables } from '../common/block/registry';
 import { installGameplay } from '../server/gameplay';
+import '../server/modules';
 import { createWorldStorage } from '../server/storage/browser';
 
 declare const self: DedicatedWorkerGlobalScope;

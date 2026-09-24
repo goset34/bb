@@ -272,6 +272,12 @@ export class PredictionLevel implements LevelAccess {
   explode(): void {}
   getDifficulty(): number { return 2; }
   getGameRule(): boolean | number { return false; }
+  hurtEntity(): boolean { return false; }
+  igniteEntity(): void {}
+  addEntityEffect(): void {}
+  placeFeature(): boolean { return false; }
+  dropBlockLoot(): void {}
+  openMenu(): void {}
 }
 
 export type { Block, PlaceContext, ItemStack, Direction };

@@ -5,9 +5,8 @@
 import type { AtlasData } from '../render/textures/atlas';
 import { getRenderShape, BLOCK_BY_NAME, Block } from '../../common/block/registry';
 import { bakeElements, BakedQuad } from '../render/mesh/bake';
-import { Tint, Element } from '../../common/block/model';
-import { box } from '../../common/block/model';
-import { biome, grassColor, foliageColor, BIRCH_FOLIAGE, SPRUCE_FOLIAGE, LILY_PAD_COLOR } from '../../common/worldgen/biomes';
+import { flatItemTexture, itemTintColor, blockItemElements, stackTint } from '../render/entity/itemmodel';
+import type { ItemStack } from '../../common/item/stack';
 
 const SIZE = 64;
 
@@ -46,29 +45,14 @@ export class IconRenderer {
     return c;
   }
 
-  private tintColor(kind: number): number {
-    const plains = biome('plains');
-    switch (kind) {
-      case Tint.Grass: return grassColor(plains);
-      case Tint.Foliage: case Tint.Mangrove: return foliageColor(plains);
-      case Tint.Water: return 0x3f76e4;
-      case Tint.Birch: return BIRCH_FOLIAGE;
-      case Tint.Spruce: return SPRUCE_FOLIAGE;
-      case Tint.LilyPad: return LILY_PAD_COLOR;
-      case Tint.Wire: return 0xd01010;
-      case Tint.Stem: case Tint.AttachedStem: return 0x60c020;
-      default: return 0xffffff;
-    }
-  }
-
   /** Icon for an item id (block model or flat sprite). */
-  icon(itemId: string, blockName?: string): string {
-    const key = itemId;
+  icon(itemId: string, blockName?: string, tint = 0xffffff): string {
+    const key = tint === 0xffffff ? itemId : `${itemId}#${tint}`;
     const cached = this.cache.get(key);
     if (cached) return cached;
     let url: string;
     const spriteLayer = this.atlas.index[`item/${itemId}`];
-    if (spriteLayer !== undefined) url = this.renderSprite(spriteLayer & 0xfff);
+    if (spriteLayer !== undefined) url = this.renderSprite(spriteLayer & 0xfff, tint);
     else {
       const b = blockName ? BLOCK_BY_NAME.get(blockName) : BLOCK_BY_NAME.get(itemId);
       url = b ? this.renderBlock(b) : this.renderMissing();
@@ -77,13 +61,18 @@ export class IconRenderer {
     return url;
   }
 
-  private renderSprite(layer: number): string {
+  /** Icon for a stack (dyed / potion colours applied to the tint mask). */
+  stackIcon(stack: ItemStack): string {
+    return this.icon(stack.id, undefined, stackTint(stack));
+  }
+
+  private renderSprite(layer: number, tint: number): string {
     const c = document.createElement('canvas');
     c.width = SIZE;
     c.height = SIZE;
     const ctx = c.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(this.textureCanvas(layer, 0xffffff), 0, 0, SIZE, SIZE);
+    ctx.drawImage(this.textureCanvas(layer, tint), 0, 0, SIZE, SIZE);
     return c.toDataURL();
   }
 
@@ -101,44 +90,23 @@ export class IconRenderer {
     return c.toDataURL();
   }
 
-  /** Flat items for plants (cross models) and thin blocks use their texture as a sprite. */
-  private flatTexture(b: Block): string | null {
-    const r = getRenderShape(b.item ? BLOCK_BY_NAME.get(b.name)!.defaultState : b.defaultState);
-    if (r.kind !== 'model') return null;
-    const els = r.elements;
-    const allRotated = els.length > 0 && els.every((e) => e.rot && e.rot.angle % 90 !== 0);
-    const thin = els.length > 0 && els.every((e) => Math.abs(e.to[0] - e.from[0]) < 0.5 || Math.abs(e.to[1] - e.from[1]) < 0.5 || Math.abs(e.to[2] - e.from[2]) < 0.5);
-    if (allRotated || thin || /torch|lantern|rail|ladder|vine|lichen|door|sign|banner|candle|dust|wire|pane|bars|chain|lever|tripwire|hook|pot|campfire|kelp|sugar_cane|bamboo|dripleaf|sapling|propagule|flower|petals|litter|mushroom|fungus|roots|sprouts|seagrass|coral|pickle|egg|spore|azalea$|cocoa|frogspawn|lily_pad|brewing_stand|bell|repeater|comparator|hopper|cauldron|shelf/.test(b.name)) {
-      const face = els[0]?.faces[Object.keys(els[0].faces)[0] as unknown as 2];
-      if (/door/.test(b.name)) return `${b.name.replace(/^waxed_/, '')}_top`;
-      return face?.tex ?? null;
-    }
-    return null;
-  }
-
   private renderBlock(b: Block): string {
     const c = document.createElement('canvas');
     c.width = SIZE;
     c.height = SIZE;
     const ctx = c.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
-    const flat = this.flatTexture(b);
+    const flat = flatItemTexture(b);
     const state = b.defaultState;
     const r = getRenderShape(state);
     if (flat && r.kind === 'model') {
       const layer = this.layerOf(flat);
       const quadTint = r.elements[0]?.faces[Object.keys(r.elements[0].faces)[0] as unknown as 2]?.tint ?? 0;
-      ctx.drawImage(this.textureCanvas(layer, this.tintColor(quadTint)), 4, 4, SIZE - 8, SIZE - 8);
+      ctx.drawImage(this.textureCanvas(layer, itemTintColor(quadTint)), 4, 4, SIZE - 8, SIZE - 8);
       return c.toDataURL();
     }
-    let els: Element[];
-    if (r.kind === 'cube') {
-      els = [box([0, 0, 0], [16, 16, 16], { 0: r.tex[0], 1: r.tex[1], 2: r.tex[2], 3: r.tex[3], 4: r.tex[4], 5: r.tex[5] })];
-      if (r.tint) for (const k of Object.keys(els[0]!.faces)) { const d = Number(k) as 0; els[0]!.faces[d]!.tint = r.tint[d] as Tint; }
-      if (r.rot) for (const k of Object.keys(els[0]!.faces)) { const d = Number(k) as 0; els[0]!.faces[d]!.rot = r.rot[d] as 0; }
-    } else if (r.kind === 'model') els = r.elements;
-    else if (r.kind === 'liquid') els = [box([0, 0, 0], [16, 16, 16], r.still)];
-    else return this.renderMissing();
+    const els = blockItemElements(b);
+    if (!els) return this.renderMissing();
     const quads = bakeElements(els, (t) => this.layerOf(t));
     this.drawQuads(ctx, quads);
     return c.toDataURL();
@@ -164,7 +132,7 @@ export class IconRenderer {
     });
     items.sort((a, b) => a.depth - b.depth);
     for (const { q, pts } of items) {
-      const tex = this.textureCanvas(q.layer & 0xfff, this.tintColor(q.tint));
+      const tex = this.textureCanvas(q.layer & 0xfff, itemTintColor(q.tint));
       const s = this.atlas.size;
       // uv (texture units 0..1) of corners TL(0), BL(1), TR(3)
       const u0 = q.uv[0]! * s, v0 = q.uv[1]! * s;

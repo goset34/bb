@@ -3,7 +3,7 @@
  * draws sky, solid, cutout and translucent geometry, selection outline and overlays.
  */
 import {
-  Device, Pipeline, GpuBuffer, Texture, Sampler, BindGroup, PipelineDesc, VertexBufferLayout,
+  Device, Pipeline, GpuBuffer, Texture, Sampler, BindGroup, PipelineDesc, VertexBufferLayout, RenderPass,
 } from './rhi/rhi';
 import { CHUNK_SHADER, SKY_SHADER, LINE_SHADER } from './shaders/chunk';
 import { FRAME_UBO_SIZE } from './shaders/common';
@@ -45,6 +45,18 @@ export interface Camera {
   roll?: number;
   /** Third person distance (0 = first person). */
   bob?: { x: number; y: number };
+}
+
+/** Extra geometry drawn inside the world pass (entities, particles, weather…). */
+export interface WorldLayer {
+  /** Called after the camera is set up, before the pass begins (build/upload geometry). */
+  prepare(cam: Camera, partial: number): void;
+  /** Opaque/cutout geometry, drawn after the cutout chunk layer. */
+  opaque?(pass: RenderPass): void;
+  /** Blended geometry, drawn after translucent chunks. */
+  translucent?(pass: RenderPass): void;
+  /** Last: first-person hand and other overlays. */
+  overlay?(pass: RenderPass): void;
 }
 
 export interface RenderSettings {
@@ -89,6 +101,9 @@ export class WorldRenderer {
   /** Selection box (block outline) in world coords, or null. */
   selection: Float32Array | null = null;
   selectionOrigin: [number, number, number] = [0, 0, 0];
+  /** Additional render layers (entities, particles…). */
+  readonly layers: WorldLayer[] = [];
+  private atlasGeneration = 0;
 
   constructor(readonly device: Device, atlas: AtlasData) {
     this.createResources(atlas);
@@ -154,7 +169,13 @@ export class WorldRenderer {
       d.writeTexture(this.albedo, packed.albedo[m]!, { mip: m, z: 0, depth: packed.pages });
       d.writeTexture(this.material, packed.material[m]!, { mip: m, z: 0, depth: packed.pages });
     }
+    this.atlasGeneration++;
     if (this.chunkGroups) this.makeGroups();
+  }
+
+  /** Shared GPU resources for other render layers. */
+  get resources(): { frameUbo: GpuBuffer; albedo: Texture; material: Texture; sampler: Sampler; indexBuffer: GpuBuffer; generation: number } {
+    return { frameUbo: this.frameUbo, albedo: this.albedo, material: this.material, sampler: this.sampler, indexBuffer: this.indexBuf, generation: this.atlasGeneration };
   }
 
   // ------------------------------------------------------------------------------------------
@@ -301,6 +322,7 @@ export class WorldRenderer {
     }
     if (n > 0) d.writeBuffer(this.drawUbo, 0, this.drawData, 0, n * DRAW_STRIDE);
     this.updateSelection(cam);
+    for (const l of this.layers) l.prepare(cam, partial);
 
     const fog = this.frameData;
     const clear: [number, number, number, number] = [fog[52]!, fog[53]!, fog[54]!, 1];
@@ -329,6 +351,7 @@ export class WorldRenderer {
       pass.setVertexBuffer(0, m.cutout);
       pass.drawIndexed((m.cutoutCount / 4) * 6);
     }
+    for (const l of this.layers) l.opaque?.(pass);
     // Selection outline
     if (this.lineBuf && this.lineCount > 0) {
       pass.setPipeline(this.linePipe);
@@ -346,6 +369,8 @@ export class WorldRenderer {
       pass.setVertexBuffer(0, m.translucent);
       pass.drawIndexed((m.translucentCount / 4) * 6);
     }
+    for (const l of this.layers) l.translucent?.(pass);
+    for (const l of this.layers) l.overlay?.(pass);
     pass.end();
     this.stats.drawCalls = d.stats.drawCalls;
     this.stats.triangles = d.stats.triangles;

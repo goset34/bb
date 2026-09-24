@@ -4,6 +4,7 @@ import type { IconRenderer } from './icons';
 import type { Inventory } from '../../common/entity/player';
 import { t, resolveText, TextComponent } from '../../common/lang/i18n';
 import { itemName } from './names';
+import { renderStack } from './slotview';
 
 export class Hud {
   readonly root: HTMLDivElement;
@@ -66,6 +67,7 @@ export class Hud {
       this.nameTimer = now + 2000;
     }
     this.itemNameEl.style.opacity = now < this.nameTimer ? '1' : '0';
+    this.updateTitles(now);
     for (const l of this.lines) {
       const age = now - l.time;
       l.el.style.opacity = this.chatOpen ? '1' : age > 10000 ? '0' : '1';
@@ -77,11 +79,7 @@ export class Hud {
   }
 
   private renderSlot(el: HTMLDivElement, inv: Inventory, i: number): void {
-    clear(el);
-    const st = inv.get(i);
-    if (st.isEmpty()) return;
-    el.appendChild(h('img', { src: this.icons.icon(st.id), draggable: 'false', alt: '' }));
-    if (st.count > 1) el.appendChild(h('div', { class: 'count' }, String(st.count)));
+    renderStack(el, inv.get(i), this.icons);
   }
 
   setDebug(left: string[], right: string[]): void {
@@ -113,11 +111,124 @@ export class Hud {
     this.chatOpen = false;
     this.chatBox.style.display = 'none';
     this.chatInput.blur();
-    this.suggest.textContent = '';
+    this.setSuggestions([]);
   }
 
-  setSuggestions(list: string[]): void {
-    this.suggest.textContent = list.slice(0, 10).join('\n');
+  // ---- titles -------------------------------------------------------------------------------
+  private titleEl: HTMLDivElement | null = null;
+  private subtitleEl: HTMLDivElement | null = null;
+  private actionEl: HTMLDivElement | null = null;
+  private titleTimes = { fadeIn: 10, stay: 70, fadeOut: 20 };
+  private titleStart = 0;
+  private actionStart = 0;
+  private subtitleText = '';
+
+  /** Handle a title packet (title / subtitle / actionbar / clear / reset / times). */
+  title(kind: string, text: TextComponent, fadeIn: number, stay: number, fadeOut: number): void {
+    if (!this.titleEl) {
+      this.titleEl = h('div', { class: 'title-big txt' });
+      this.subtitleEl = h('div', { class: 'hud-subtitle txt' });
+      this.actionEl = h('div', { class: 'actionbar txt' });
+      this.root.append(this.titleEl, this.subtitleEl, this.actionEl);
+    }
+    const now = performance.now();
+    switch (kind) {
+      case 'title':
+        this.titleEl.textContent = resolveText(text);
+        this.subtitleEl!.textContent = this.subtitleText;
+        this.subtitleText = '';
+        this.titleStart = now;
+        break;
+      case 'subtitle':
+        this.subtitleText = resolveText(text);
+        this.subtitleEl!.textContent = this.subtitleText;
+        break;
+      case 'actionbar':
+        this.actionEl!.textContent = resolveText(text);
+        this.actionStart = now;
+        break;
+      case 'times':
+        this.titleTimes = { fadeIn, stay, fadeOut };
+        break;
+      case 'clear':
+        this.titleStart = 0;
+        break;
+      case 'reset':
+        this.titleStart = 0;
+        this.subtitleText = '';
+        this.titleTimes = { fadeIn: 10, stay: 70, fadeOut: 20 };
+        break;
+    }
+  }
+
+  private updateTitles(now: number): void {
+    if (!this.titleEl) return;
+    const tt = this.titleTimes;
+    const total = (tt.fadeIn + tt.stay + tt.fadeOut) * 50;
+    const age = now - this.titleStart;
+    let a = 0;
+    if (this.titleStart && age < total) {
+      if (age < tt.fadeIn * 50) a = age / Math.max(1, tt.fadeIn * 50);
+      else if (age < (tt.fadeIn + tt.stay) * 50) a = 1;
+      else a = 1 - (age - (tt.fadeIn + tt.stay) * 50) / Math.max(1, tt.fadeOut * 50);
+    }
+    this.titleEl.style.opacity = String(a);
+    this.subtitleEl!.style.opacity = String(a);
+    const aa = now - this.actionStart;
+    this.actionEl!.style.opacity = String(this.actionStart && aa < 3000 ? Math.min(1, (3000 - aa) / 500) : 0);
+  }
+
+  /** Small notification in the top-right corner (recipes, advancements, tutorial hints). */
+  toast(title: string, detail = '', icon?: string): void {
+    let box = this.root.querySelector('.toasts') as HTMLDivElement | null;
+    if (!box) {
+      box = h('div', { class: 'toasts' });
+      this.root.appendChild(box);
+    }
+    const el = h('div', { class: 'toast txt' },
+      icon ? h('img', { src: icon, alt: '', draggable: 'false' }) : null,
+      h('div', {}, h('div', { class: 't' }, title), detail ? h('div', { class: 'd' }, detail) : null));
+    box.appendChild(el);
+    while (box.children.length > 4) box.firstChild!.remove();
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, 5000);
+  }
+
+  /** Command suggestions: `start` is where the completion replaces the input (after '/'). */
+  private suggestions: string[] = [];
+  private suggestStart = 0;
+  private suggestSel = -1;
+
+  setSuggestions(list: string[], start = 0): void {
+    this.suggestions = list;
+    this.suggestStart = start;
+    this.suggestSel = -1;
+    this.renderSuggestions();
+  }
+
+  private renderSuggestions(): void {
+    clear(this.suggest);
+    const list = this.suggestions;
+    const first = Math.max(0, Math.min(this.suggestSel - 4, list.length - 10));
+    for (let i = first; i < Math.min(list.length, first + 10); i++) {
+      this.suggest.appendChild(h('div', { class: i === this.suggestSel ? 'sel' : '' }, list[i]!));
+    }
+    this.suggest.style.display = list.length ? '' : 'none';
+    this.suggest.style.marginLeft = `${Math.min(30, this.suggestStart + 1) * 0.55}em`;
+  }
+
+  /** Tab / arrows: cycle suggestions and insert the selected one. Returns true if handled. */
+  cycleSuggestion(dir: number): boolean {
+    if (!this.suggestions.length) return false;
+    this.suggestSel = (this.suggestSel + dir + this.suggestions.length) % this.suggestions.length;
+    const v = this.chatInput.value;
+    const head = v.slice(0, 1 + this.suggestStart);
+    this.chatInput.value = head + this.suggestions[this.suggestSel]!;
+    this.renderSuggestions();
+    return true;
+  }
+
+  get hasSuggestions(): boolean {
+    return this.suggestions.length > 0;
   }
 }
 
