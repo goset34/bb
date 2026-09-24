@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 /** Terrain generation worker: builds generators from the world seed and serves chunk requests. */
 import { initRegistries } from '../common/init';
+import { installNativeKernels } from '../common/native/native';
 import { parseSeed } from '../common/math/random';
 import { createGenerators } from '../common/worldgen/factory';
 import { handleGenRequest } from '../server/gen';
@@ -13,10 +14,11 @@ declare const self: DedicatedWorkerGlobalScope;
 
 let generators: Map<DimensionId, ChunkGenerator> | null = null;
 
-self.onmessage = (ev: MessageEvent) => {
+self.onmessage = async (ev: MessageEvent) => {
   const msg = ev.data as { type: string; seed: string; settings: GeneratorSettings; tables: StateTables; port: MessagePort };
   if (msg.type !== 'init') return;
   initRegistries(msg.tables);
+  await installNativeKernels();
   generators = createGenerators(parseSeed(msg.seed), msg.settings);
   const port = msg.port;
   port.onmessage = (e: MessageEvent) => {

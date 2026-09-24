@@ -101,79 +101,123 @@ export class ImprovedNoise {
   }
 }
 
+/** One octave inside a {@link NoiseStack}: value += amp * noise(wrap(x·freq), wrap(y·freq), wrap(z·freq)). */
+export interface NoiseOctave {
+  readonly noise: ImprovedNoise;
+  readonly freq: number;
+  readonly amp: number;
+}
+
 /**
- * Sum of octaves. `firstOctave` is negative for low frequencies (e.g. -7 means the lowest
- * octave has a frequency of 2^-7). `amplitudes[i]` weights octave i (0 disables it).
+ * Batch evaluation backend (the WASM kernel). Implementations must reproduce
+ * {@link NoiseStack.sample} bit for bit.
  */
-export class OctaveNoise {
-  readonly octaves: (ImprovedNoise | null)[];
-  readonly amplitudes: number[];
-  readonly lowestFreqInputFactor: number;
-  readonly lowestFreqValueFactor: number;
+export interface NoiseKernel {
+  readonly name: string;
+  register(stack: NoiseStack): number;
+  batch(handle: number, xs: Float64Array, ys: Float64Array, zs: Float64Array, n: number, out: Float64Array): void;
+}
+
+let kernel: NoiseKernel | null = null;
+let kernelEpoch = 0;
+
+/** Install (or remove) the batch noise backend for this thread. */
+export function setNoiseKernel(k: NoiseKernel | null): void {
+  kernel = k;
+  kernelEpoch++;
+}
+
+export function getNoiseKernel(): NoiseKernel | null {
+  return kernel;
+}
+
+/** Minimum batch size worth sending to the native kernel. */
+const KERNEL_MIN_BATCH = 16;
+
+/**
+ * Flattened list of Perlin octaves. This is the canonical evaluation order shared with the
+ * native kernel: octaves are accumulated in list order as total = total + amp * v.
+ */
+export class NoiseStack {
+  readonly octaves: NoiseOctave[];
+  /** Upper bound of |sample|. */
   readonly maxValue: number;
+  private handle = -1;
+  private handleEpoch = -1;
 
-  constructor(rng: Random, firstOctave: number, amplitudes: number[]) {
-    this.amplitudes = amplitudes.slice();
-    this.octaves = [];
-    for (let i = 0; i < amplitudes.length; i++) {
-      const r = rng.fork(firstOctave + i + 1000);
-      this.octaves.push(amplitudes[i] !== 0 ? new ImprovedNoise(r) : null);
-    }
-    let f = 1;
-    for (let i = 0; i < -firstOctave; i++) f /= 2;
-    for (let i = 0; i < firstOctave; i++) f *= 2;
-    this.lowestFreqInputFactor = f;
-    let v = 1;
-    for (let i = 0; i < amplitudes.length - 1; i++) v *= 2;
-    // value factor = 2^(n-1) / (2^n - 1)
-    let denom = 1;
-    for (let i = 0; i < amplitudes.length; i++) denom *= 2;
-    this.lowestFreqValueFactor = v / (denom - 1);
-    this.maxValue = this.edgeValue(2);
-  }
-
-  private edgeValue(v: number): number {
-    let total = 0;
-    let vf = this.lowestFreqValueFactor;
-    for (let i = 0; i < this.octaves.length; i++) {
-      if (this.octaves[i]) total += this.amplitudes[i]! * v * vf;
-      vf /= 2;
-    }
-    return total;
+  constructor(octaves: NoiseOctave[]) {
+    this.octaves = octaves;
+    let m = 0;
+    for (const o of octaves) m += Math.abs(o.amp);
+    this.maxValue = m;
   }
 
   sample(x: number, y: number, z: number): number {
     let total = 0;
-    let inF = this.lowestFreqInputFactor;
-    let vF = this.lowestFreqValueFactor;
-    const n = this.octaves.length;
-    for (let i = 0; i < n; i++) {
-      const o = this.octaves[i];
-      if (o) {
-        const v = o.noise(wrapCoord(x * inF), wrapCoord(y * inF), wrapCoord(z * inF));
-        total += this.amplitudes[i]! * v * vF;
-      }
-      inF *= 2;
-      vF /= 2;
+    const oct = this.octaves;
+    for (let i = 0; i < oct.length; i++) {
+      const o = oct[i]!;
+      total = total + o.amp * o.noise.noise(wrapCoord(x * o.freq), wrapCoord(y * o.freq), wrapCoord(z * o.freq));
     }
     return total;
+  }
+
+  /** Evaluate n points (xs[i], ys[i], zs[i]) into out[i]. */
+  sampleBatch(xs: Float64Array, ys: Float64Array, zs: Float64Array, n: number, out: Float64Array): void {
+    const k = kernel;
+    if (k && n >= KERNEL_MIN_BATCH) {
+      if (this.handleEpoch !== kernelEpoch) {
+        this.handle = k.register(this);
+        this.handleEpoch = kernelEpoch;
+      }
+      k.batch(this.handle, xs, ys, zs, n, out);
+      return;
+    }
+    for (let i = 0; i < n; i++) out[i] = this.sample(xs[i]!, ys[i]!, zs[i]!);
+  }
+}
+
+function octaveFactors(firstOctave: number, count: number): { inF: number; vF: number } {
+  let f = 1;
+  for (let i = 0; i < -firstOctave; i++) f /= 2;
+  for (let i = 0; i < firstOctave; i++) f *= 2;
+  let v = 1;
+  for (let i = 0; i < count - 1; i++) v *= 2;
+  let denom = 1;
+  for (let i = 0; i < count; i++) denom *= 2;
+  // value factor = 2^(n-1) / (2^n - 1): the lowest octave weighs most, the sum stays ≈ [-1, 1]
+  return { inF: f, vF: v / (denom - 1) };
+}
+
+function buildOctaves(rng: Random, firstOctave: number, amplitudes: readonly number[], freqMul: number, ampMul: number): NoiseOctave[] {
+  const out: NoiseOctave[] = [];
+  let { inF, vF } = octaveFactors(firstOctave, amplitudes.length);
+  for (let i = 0; i < amplitudes.length; i++) {
+    const r = rng.fork(firstOctave + i + 1000);
+    if (amplitudes[i] !== 0) out.push({ noise: new ImprovedNoise(r), freq: inF * freqMul, amp: amplitudes[i]! * vF * ampMul });
+    inF *= 2;
+    vF /= 2;
+  }
+  return out;
+}
+
+/**
+ * Sum of octaves. `firstOctave` is negative for low frequencies (e.g. -7 means the lowest
+ * octave has a frequency of 2^-7). `amplitudes[i]` weights octave i (0 disables it).
+ */
+export class OctaveNoise extends NoiseStack {
+  constructor(rng: Random, firstOctave: number, amplitudes: readonly number[], scale = 1) {
+    super(buildOctaves(rng, firstOctave, amplitudes, 1, scale));
   }
 }
 
 /**
- * "Normal" noise: two octave noises sampled at slightly different scales and summed,
- * then normalised so the output roughly spans [-1, 1] with a gaussian-like distribution.
- * Used for climate parameters.
+ * "Normal" noise: two octave sets sampled at slightly different scales and summed, then
+ * normalised so the output roughly spans [-1, 1] with a gaussian-like distribution.
+ * Used for climate parameters and caves.
  */
-export class NormalNoise {
-  private readonly first: OctaveNoise;
-  private readonly second: OctaveNoise;
-  private readonly valueFactor: number;
-  readonly maxValue: number;
-
-  constructor(rng: Random, firstOctave: number, amplitudes: number[]) {
-    this.first = new OctaveNoise(rng.fork('a'), firstOctave, amplitudes);
-    this.second = new OctaveNoise(rng.fork('b'), firstOctave, amplitudes);
+export class NormalNoise extends NoiseStack {
+  constructor(rng: Random, firstOctave: number, amplitudes: readonly number[]) {
     let minI = Number.MAX_SAFE_INTEGER;
     let maxI = Number.MIN_SAFE_INTEGER;
     for (let i = 0; i < amplitudes.length; i++) {
@@ -183,13 +227,12 @@ export class NormalNoise {
       }
     }
     const span = maxI - minI;
-    this.valueFactor = 0.16666666666666666 / (0.1 * (1 + 1 / (span + 1)));
-    this.maxValue = (this.first.maxValue + this.second.maxValue) * this.valueFactor;
-  }
-
-  sample(x: number, y: number, z: number): number {
+    const valueFactor = 0.16666666666666666 / (0.1 * (1 + 1 / (span + 1)));
     const k = 1.0181268882175227;
-    return (this.first.sample(x, y, z) + this.second.sample(x * k, y * k, z * k)) * this.valueFactor;
+    super([
+      ...buildOctaves(rng.fork('a'), firstOctave, amplitudes, 1, valueFactor),
+      ...buildOctaves(rng.fork('b'), firstOctave, amplitudes, k, valueFactor),
+    ]);
   }
 }
 

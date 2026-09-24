@@ -93,11 +93,8 @@ export class Chunk {
   }
 
   private updateHeightmaps(lx: number, y: number, lz: number, state: number): void {
-    const f = stateFlags[state]!;
-    this.updateOne(this.surface, lx, y, lz, (f & F.AIR) === 0, (st) => (stateFlags[st]! & F.AIR) === 0);
-    const motionTest = (st: number) => (stateFlags[st]! & (F.NO_COLLISION)) === 0 || (stateFlags[st]! & (F.WATER | F.LAVA)) !== 0;
+    this.updateOne(this.surface, lx, y, lz, surfaceTest(state), surfaceTest);
     this.updateOne(this.motion, lx, y, lz, motionTest(state), motionTest);
-    const opaqueTest = (st: number) => opacityOf(st) > 0;
     this.updateOne(this.opaque, lx, y, lz, opaqueTest(state), opaqueTest);
   }
 
@@ -231,6 +228,19 @@ export class Chunk {
   sectionIndexOf(y: number): number {
     return (y >> 4) - this.minSection;
   }
+}
+
+function surfaceTest(st: number): boolean {
+  return (stateFlags[st]! & F.AIR) === 0;
+}
+
+function motionTest(st: number): boolean {
+  const f = stateFlags[st]!;
+  return (f & F.NO_COLLISION) === 0 || (f & (F.WATER | F.LAVA)) !== 0;
+}
+
+function opaqueTest(st: number): boolean {
+  return opacityOf(st) > 0;
 }
 
 function opacityOf(s: number): number {

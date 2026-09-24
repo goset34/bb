@@ -6,7 +6,7 @@ Cada hito deja el proyecto compilando (`npm run typecheck`), con los tests en ve
 | Hito | Estado | Contenido |
 |---|---|---|
 | H1 | ✅ | Motor: RHI WebGPU + WebGL2, chunks, mallado, cámara, física, servidor integrado |
-| H2 | ⏳ | Generación del mundo y biomas (+ WASM) |
+| H2 | ✅ | Generación del mundo y biomas (+ WASM) |
 | H3 | ⏳ | Jugador, inventario, crafteo, supervivencia |
 | H4 | ⏳ | Criaturas e IA |
 | H5 | ⏳ | Redstone, fluidos y bloques funcionales |
@@ -51,11 +51,38 @@ Incluye:
 
 ## H2 — Generación del mundo y biomas
 
-Ruido climático multiparámetro (temperatura, humedad, continentalidad, erosión, rareza,
-profundidad), *splines* de densidad, cuevas queso/espagueti/fideo, acuíferos, túneles y
-barrancos, menas con distribución por altura, árboles y vegetación por bioma, todos los biomas
-del Mundo Superior, tipos de mundo (normal, plano, amplificado, grandes biomas, un solo bioma) y
-núcleo de ruido/mallado en Rust→WASM (SIMD) con pruebas de paridad.
+**Criterio de aceptación:** semillas deterministas, biomas, cuevas, acuíferos, menas, árboles y
+vegetación; mismo resultado con el núcleo WASM y con TypeScript.
+
+Incluye:
+
+- Modelo climático multiparámetro propio (temperatura, humedad, continentalidad, erosión,
+  rareza → picos/valles) y modelador de terreno con curvas monótonas: océanos profundos,
+  costas, llanuras, colinas, cordilleras con crestas dentadas, mesetas, ríos y humedales.
+- 60 biomas del Mundo Superior, incluidos biomas de cueva (cuevas frondosas, cuevas de
+  espeleotemas, abismo oscuro) y variantes por rareza; bordes de bioma con jitter.
+- Densidad 3D interpolada con cuevas queso (con pilares), espagueti, fideos y entradas;
+  acuíferos con niveles locales, inundación marina, lava profunda y barreras; vetas grandes de
+  cobre (granito) y hierro (toba); pizarra profunda con transición, lecho de roca irregular.
+- Reglas de superficie por bioma (terracota con bandas y chimeneas de hadas, cumbres nevadas y
+  heladas, calcita, fondos marinos, barro, micelio, podsol…) y carvers de túneles y cañones.
+- Decorador por etapas con más de 150 *placed features*: todas las menas con su distribución
+  por altura, geodas de amatista, mazmorras, fósiles, lagos de lava, manantiales, árboles
+  (roble, roble grande, abedul, abedul alto, abeto, pino, abetos y pinos gigantes, jungla y
+  jungla gigante, arbustos, acacia, roble oscuro, roble pálido con musgo colgante y corazón,
+  mangle con raíces y propágulos, cerezo, azalea, champiñones gigantes, troncos caídos), flores
+  por bioma, pétalos, hojarasca, arbustos, cactus con flor, caña, bambú, bayas, calabazas,
+  sandías, nenúfares, pasto marino, algas, pepinos de mar, arrecifes de coral, icebergs, hielo
+  azul, pinchos de hielo, pozos del desierto, rocas musgosas, líquenes, espeleotemas, cuevas
+  frondosas (musgo, lianas con bayas, flores de esporas, charcas de arcilla con plantaforma,
+  azaleas enraizadas) y musgo de eco con sensores y chilladores; capa de nieve/hielo final.
+- Tipos de mundo: normal, superplano, biomas grandes, amplificado, islas flotantes, bioma
+  único y modo depuración (todos los estados de bloque).
+- Núcleo **Rust → WebAssembly SIMD** (`native/`, compilado en `src/native/strata.wasm`) para el
+  ruido, con paridad bit a bit comprobada a nivel de ruido y de chunk completo, y
+  *fallback* automático a TypeScript.
+- Pruebas: paridad WASM/TS, determinismo por semilla, capas geológicas, océanos, decoración,
+  islas flotantes, punto de aparición seco; E2E de un mundo normal.
 
 ## H3 — Jugador, inventario, crafteo, supervivencia
 

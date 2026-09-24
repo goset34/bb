@@ -58,6 +58,26 @@ Capturas de pantalla automáticas (con `npm run dev` en marcha):
 npm run shot -- webgpu captura.png debug_simple 4000
 ```
 
+## Núcleo nativo (opcional)
+
+El ruido de generación tiene un núcleo en Rust compilado a WebAssembly con SIMD. El binario ya
+está incluido en `src/native/strata.wasm`; para recompilarlo:
+
+```bash
+rustup target add wasm32-unknown-unknown
+npm run build:wasm
+```
+
+Si el navegador no admite WebAssembly SIMD, el juego usa la implementación TypeScript, que da
+exactamente el mismo mundo.
+
+Herramientas de generación:
+
+```bash
+npm run map -- <semilla> mapa.png          # mapa de biomas/alturas
+npm run genview -- <semilla> /tmp/vista 6  # vista cenital y corte vertical reales
+```
+
 ## Documentación
 
 - [docs/DESIGN.md](docs/DESIGN.md) — arquitectura, hilos, flujo de datos y formato de guardado

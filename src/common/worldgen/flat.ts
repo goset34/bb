@@ -2,7 +2,7 @@
 import { Chunk } from '../world/chunk';
 import { ChunkGenerator, GenRegion, GeneratorSettings } from './generator';
 import { DimensionType } from '../world/dimension';
-import { S, tryGetBlock } from '../block/registry';
+import { S, tryGetBlock, STATE_COUNT } from '../block/registry';
 import { biomeId } from './biomes';
 import { WorldSeed, Random, chunkRandom, subSeed } from '../math/random';
 import { OctaveNoise } from '../math/noise';
@@ -131,5 +131,56 @@ export class SimpleGenerator implements ChunkGenerator {
       }
     }
     return { x: 0.5, y: 100, z: 0.5 };
+  }
+}
+
+/**
+ * Debug world: every block state laid out on a grid at y = 70 (two blocks apart) above a
+ * barrier floor, for inspecting models and textures.
+ */
+export class DebugGenerator implements ChunkGenerator {
+  private readonly grid: number;
+  private readonly barrier: number;
+  private readonly biome = biomeId('plains');
+
+  constructor(readonly dim: DimensionType) {
+    this.grid = Math.ceil(Math.sqrt(STATE_COUNT));
+    this.barrier = S('barrier');
+  }
+
+  /** State at world column (x, z) or 0. */
+  stateAt(x: number, z: number): number {
+    if (x <= 0 || z <= 0 || x % 2 !== 1 || z % 2 !== 1) return 0;
+    const i = (x - 1) / 2, j = (z - 1) / 2;
+    if (i >= this.grid || j >= this.grid) return 0;
+    const s = j * this.grid + i + 1;
+    return s < STATE_COUNT ? s : 0;
+  }
+
+  generateTerrain(chunk: Chunk): void {
+    const bx = chunk.x << 4, bz = chunk.z << 4;
+    for (let lz = 0; lz < 16; lz++) {
+      for (let lx = 0; lx < 16; lx++) {
+        chunk.setBlock(lx, 60, lz, this.barrier);
+        const st = this.stateAt(bx + lx, bz + lz);
+        if (st) chunk.setBlock(lx, 70, lz, st);
+      }
+    }
+    for (const s of chunk.sections) s.biomes.fill(this.biome);
+    chunk.recomputeHeightmaps();
+  }
+
+  decorate(): void {}
+
+  surfaceHeight(): number {
+    return 61;
+  }
+
+  biomeAt(): number {
+    return this.biome;
+  }
+
+  findSpawn() {
+    return { x: 0.5, y: 71, z: 0.5 };
   }
 }

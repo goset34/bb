@@ -6,7 +6,7 @@ import type { Chunk } from '../world/chunk';
 import type { WorldSeed } from '../math/random';
 import type { DimensionType } from '../world/dimension';
 
-export type WorldType = 'normal' | 'flat' | 'floating_islands' | 'amplified' | 'single_biome' | 'debug_simple';
+export type WorldType = 'normal' | 'flat' | 'large_biomes' | 'amplified' | 'floating_islands' | 'single_biome' | 'debug' | 'debug_simple';
 
 export interface GeneratorSettings {
   type: WorldType;

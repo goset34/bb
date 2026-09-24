@@ -188,25 +188,50 @@ Orden por tick de un nivel (igual que la referencia):
 
 ```mermaid
 flowchart TD
-  S[Semilla 64 bits] --> RNG[Xoroshiro/hash posicional]
-  RNG --> CN[Ruidos de clima:\ntemperatura, humedad, continentalidad,\nerosión, rareza, profundidad]
-  CN --> SP[Splines: offset, factor, jaggedness]
-  SP --> D[Densidad final 3D\n+ queso + espagueti + fideos]
-  D --> AQ[Acuíferos: niveles de agua/lava locales]
-  CN --> BS[Selección multiruido de bioma\n(vecino más cercano en 7D)]
-  AQ --> SR[Reglas de superficie por bioma]
+  S[Semilla 64 bits] --> RNG[xoshiro128** + hash posicional]
+  RNG --> CN[Ruidos de clima:\ntemperatura, humedad, continentalidad,\nerosión, rareza → picos/valles]
+  CN --> SP[Modelador: altura suave, escala 3D,\ncrestas, ríos, humedales, mesetas]
+  SP --> D[Densidad 3D en celdas 4×8×4\n+ queso + pilares + espagueti + fideos + entradas]
+  D --> AQ[Acuíferos: celdas 16×12×16 con nivel\nmar / freático / lava / seco + barreras]
+  D --> VE[Vetas grandes de cobre/hierro]
+  CN --> BS[Selector de bioma de superficie\n+ biomas de cueva]
+  AQ --> SR[Reglas de superficie por bioma\n(bordes de bioma con jitter)]
   BS --> SR
-  SR --> CV[Carvers: cuevas y cañones]
-  CV --> FE[Features por etapas]
-  FE --> ST[Piezas de estructuras]
+  SR --> CV[Carvers: túneles y cañones\n(caché por chunk de origen)]
+  CV --> FE[Decorador: features por etapa y bioma]
+  FE --> ST[Piezas de estructuras (H6)]
 ```
 
-* Densidad evaluada en esquinas de celdas 4×8×4 e interpolada trilinealmente (como la
-  referencia), lo que hace la generación 20–30× más barata que evaluar por bloque.
-* El ruido (Perlin mejorado octavado) tiene implementación TS y Rust→WASM (SIMD 128) con
-  resultados idénticos; se valida en tests.
-* Tipos de mundo: `normal`, `flat` (capas configurables), `floating_islands`, `amplified`,
-  `single_biome`.
+* **Clima** (`worldgen/overworld/climate.ts`): seis parámetros por columna a partir de
+  `NormalNoise` con desplazamiento de dominio. Los umbrales, curvas (Hermite monótona) y la tabla
+  de biomas son propios de STRATA; solo se comparte el enfoque multiparámetro.
+* **Terreno** (`terrain.ts`): la densidad se evalúa en las esquinas de celdas 4×8×4 y se
+  interpola trilinealmente. El ruido de detalle solo se calcula en la franja de la superficie y
+  las cuevas solo en suelo sólido. Todas las muestras se agrupan por lotes (`sampleBatch`), que
+  el núcleo WASM SIMD evalúa ~2,4× más rápido que TS con resultados **bit a bit idénticos**
+  (`tests/unit/noise.test.ts`, `worldgen.test.ts`).
+* **Acuíferos**: celdas con centro aleatorio; cada una tiene nivel de mar (cerca de océanos y
+  ríos), nivel freático local, lava (por debajo de Y −40) o ninguno. Entre celdas con niveles
+  distintos aparece una barrera de piedra.
+* **Superficie** (`surface.ts`): hierba/tierra, arena y arenisca, bandas de terracota con
+  chimeneas de hadas, nieve y hielo compacto en cumbres, calcita, fondos marinos (arena, grava,
+  arcilla), barro, micelio, podsol… Las fronteras entre biomas usan un zoom con jitter.
+* **Carvers** (`carvers.ts`): túneles serpenteantes con salas y cañones; cada sistema se calcula
+  una vez por chunk de origen y se reutiliza para los 17×17 chunks que puede atravesar.
+* **Decoración** (`features/`): framework de *placed features* (count, rarity, inSquare,
+  heightmap, uniform/triangle/biased Y, surfaceWaterDepth, filtros) ejecutado por etapas en orden
+  global estable. Incluye menas (con descarte por aire), manchas de piedra, discos, geodas,
+  mazmorras con cofres y generador, fósiles, lagos de lava, manantiales, más de 20 tipos de
+  árbol (con distancia de hojas correcta, lianas, cacao, nidos de abejas, hojarasca), flora por
+  bioma, corales, algas, icebergs, pinchos de hielo, cuevas frondosas, espeleotemas, musgo de eco
+  y la capa superior de nieve/hielo según temperatura y altitud.
+* **Tipos de mundo**: `normal`, `flat` (capas configurables), `large_biomes`, `amplified`,
+  `floating_islands`, `single_biome`, `debug` (todos los estados de bloque en rejilla) y
+  `debug_simple` (colinas rápidas para pruebas).
+* **Coste medido** (Node, WASM SIMD): ~4 ms por chunk de terreno en un worker y ~4,5 ms de
+  decoración en el hilo del servidor.
+* Herramientas: `npm run map -- <semilla> map.png` (mapa de clima) y
+  `npm run genview -- <semilla> prefijo` (vista cenital y corte vertical con bloques reales).
 
 ---
 

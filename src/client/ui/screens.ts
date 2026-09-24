@@ -101,7 +101,7 @@ export function createWorldScreen(host: ScreenHost, actions: { create(req: Creat
   const biomeIn = h('input', { class: 'input', value: 'plains' }) as HTMLInputElement;
   const biomeField = h('div', { class: 'field', style: { display: 'none' } }, h('label', { class: 'txt' }, t('createWorld.singleBiome')), biomeIn);
   const modes: Array<GameMode | 'hardcore'> = ['survival', 'creative', 'adventure', 'spectator', 'hardcore'];
-  const types: WorldType[] = ['normal', 'flat', 'floating_islands', 'amplified', 'single_biome', 'debug_simple'];
+  const types: WorldType[] = ['normal', 'flat', 'large_biomes', 'amplified', 'floating_islands', 'single_biome', 'debug'];
   return screen('dirt',
     h('div', { class: 'txt', style: { fontSize: '1.4em' } }, t('createWorld.title')),
     h('div', { class: 'field' }, h('label', { class: 'txt' }, t('createWorld.name')), nameIn),

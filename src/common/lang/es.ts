@@ -60,6 +60,8 @@ export const ES: Record<string, string> = {
   'worldType.amplified': 'Amplificado',
   'worldType.single_biome': 'Bioma único',
   'worldType.debug_simple': 'Simple (rápido)',
+  'worldType.large_biomes': 'Biomas grandes',
+  'worldType.debug': 'Modo depuración',
   'options.title': 'Opciones',
   'options.graphics': 'Gráficos…',
   'options.audio': 'Música y sonidos…',

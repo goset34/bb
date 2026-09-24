@@ -46,7 +46,7 @@ export function registerNatural(): void {
   cube('chiseled_deepslate', stoneLike(3.5, 6, { sound: 'deepslate_bricks', map: 'deepslate' }));
   cubeBT('reinforced_deepslate', { hardness: 55, resistance: 1200, sound: 'deepslate', map: 'deepslate', push: 'block', noDrops: true }, 'reinforced_deepslate_bottom', 'reinforced_deepslate_top', 'reinforced_deepslate_side');
 
-  cube('tuff', stoneLike(1.5, 6, { sound: 'tuff', map: 'terracotta_gray', tags: ['base_stone_overworld'] }));
+  cube('tuff', stoneLike(1.5, 6, { sound: 'tuff', map: 'terracotta_gray', tags: ['base_stone_overworld', 'deepslate_ore_replaceables'] }));
   cube('polished_tuff', stoneLike(1.5, 6, { sound: 'tuff', map: 'terracotta_gray' }));
   cube('tuff_bricks', stoneLike(1.5, 6, { sound: 'tuff', map: 'terracotta_gray' }));
   cubeBT('chiseled_tuff', stoneLike(1.5, 6, { sound: 'tuff' }), 'chiseled_tuff_top', 'chiseled_tuff_top', 'chiseled_tuff');

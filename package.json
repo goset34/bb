@@ -13,7 +13,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "shot": "node scripts/shot.mjs"
+    "shot": "node scripts/shot.mjs",
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "map": "tsx scripts/worldmap.ts",
+    "genview": "tsx scripts/genview.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.55.0",

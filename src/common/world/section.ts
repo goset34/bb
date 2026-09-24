@@ -11,6 +11,12 @@ export function sidx(x: number, y: number, z: number): number {
   return (y << 8) | (z << 4) | x;
 }
 
+/** Scratch tables for {@link Section.load} (palette building without hashing). */
+const loadSeen = new Uint32Array(65536);
+const loadIndex = new Uint16Array(65536);
+let loadStamp = 0;
+const recountScratch = new Uint16Array(256);
+
 export class Section {
   /** Value when the section is uniform (no arrays). */
   private single = 0;
@@ -120,6 +126,46 @@ export class Section {
     this.paletteIndex = null;
   }
 
+  /** Bulk-load 4096 states (y<<8 | z<<4 | x order) from `src` starting at `offset`. */
+  load(src: Uint16Array, offset = 0): void {
+    const first = src[offset]!;
+    let uniform = true;
+    for (let i = 1; i < SECTION_VOLUME; i++) {
+      if (src[offset + i] !== first) { uniform = false; break; }
+    }
+    if (uniform) {
+      this.fill(first);
+      return;
+    }
+    const stamp = ++loadStamp;
+    const palette: number[] = [];
+    const d8 = new Uint8Array(SECTION_VOLUME);
+    let direct = false;
+    for (let i = 0; i < SECTION_VOLUME; i++) {
+      const st = src[offset + i]!;
+      if (loadSeen[st] !== stamp) {
+        if (palette.length >= 256) { direct = true; break; }
+        loadSeen[st] = stamp;
+        loadIndex[st] = palette.length;
+        palette.push(st);
+      }
+      d8[i] = loadIndex[st]!;
+    }
+    if (direct) {
+      this.data16 = src.slice(offset, offset + SECTION_VOLUME);
+      this.data8 = null;
+      this.palette = null;
+      this.paletteIndex = null;
+    } else {
+      this.data8 = d8;
+      this.data16 = null;
+      this.palette = palette;
+      this.paletteIndex = new Map(palette.map((st, k) => [st, k]));
+    }
+    this.recount();
+    this.revision++;
+  }
+
   /** Fill the whole section with one state. */
   fill(state: number): void {
     this.single = state;
@@ -139,9 +185,24 @@ export class Section {
       if (!(f & F.AIR)) nonAir = SECTION_VOLUME;
       if (f & F.RANDOM_TICKS) tick = SECTION_VOLUME;
       if (f & (F.WATER | F.LAVA)) fluids = SECTION_VOLUME;
+    } else if (this.data8) {
+      const counts = recountScratch;
+      counts.fill(0);
+      const d8 = this.data8;
+      for (let i = 0; i < SECTION_VOLUME; i++) counts[d8[i]!]++;
+      const p = this.palette!;
+      for (let k = 0; k < p.length; k++) {
+        const n = counts[k]!;
+        if (!n) continue;
+        const f = stateFlags[p[k]!]!;
+        if (!(f & F.AIR)) nonAir += n;
+        if (f & F.RANDOM_TICKS) tick += n;
+        if (f & (F.WATER | F.LAVA)) fluids += n;
+      }
     } else {
+      const d16 = this.data16!;
       for (let i = 0; i < SECTION_VOLUME; i++) {
-        const f = stateFlags[this.get(i)]!;
+        const f = stateFlags[d16[i]!]!;
         if (!(f & F.AIR)) nonAir++;
         if (f & F.RANDOM_TICKS) tick++;
         if (f & (F.WATER | F.LAVA)) fluids++;

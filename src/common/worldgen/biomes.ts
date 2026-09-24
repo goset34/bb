@@ -209,3 +209,26 @@ export function temperatureAt(b: Biome, y: number, noise = 0): number {
 export function coldEnoughToSnow(b: Biome, y: number): boolean {
   return temperatureAt(b, y) < 0.15 && b.precipitation !== 'none';
 }
+
+/**
+ * Jittered quart lookup: each 4×4 biome cell gets a hashed centre and a block belongs to the
+ * nearest centre among its four neighbours. Borders become irregular instead of grid-aligned.
+ * Writes the world quart coordinates into `out`.
+ */
+export function fuzzyQuart(seedHash: number, x: number, z: number, out: [number, number]): [number, number] {
+  const qx0 = Math.floor((x - 2) / 4), qz0 = Math.floor((z - 2) / 4);
+  let best = Infinity;
+  for (let b = 0; b < 2; b++) {
+    for (let a = 0; a < 2; a++) {
+      const qx = qx0 + a, qz = qz0 + b;
+      let h = Math.imul(qx, 0x27d4eb2d) ^ Math.imul(qz, 0x165667b1) ^ seedHash;
+      h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+      h ^= h >>> 13;
+      const jx = ((h & 255) / 255) * 3.6 - 1.8, jz = (((h >>> 8) & 255) / 255) * 3.6 - 1.8;
+      const dx = qx * 4 + 2 + jx - x, dz = qz * 4 + 2 + jz - z;
+      const d = dx * dx + dz * dz;
+      if (d < best) { best = d; out[0] = qx; out[1] = qz; }
+    }
+  }
+  return out;
+}
