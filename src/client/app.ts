@@ -5,6 +5,7 @@
 import { initRegistries } from '../common/init';
 import { exportStateTables, StateTables, STATE_COUNT, getRenderShape } from '../common/block/registry';
 import { buildAtlas, AtlasData } from './render/textures/atlas';
+import { ITEM_LIST } from '../common/item/items';
 import { texturesOf } from './render/mesh/bake';
 import { Device } from './render/rhi/rhi';
 import { WebGL2Device } from './render/rhi/webgl2';
@@ -112,6 +113,7 @@ export class App implements ScreenHost {
     const names = new Set<string>();
     for (let s = 0; s < STATE_COUNT; s++) texturesOf(getRenderShape(s), names);
     for (let i = 0; i < 10; i++) names.add(`destroy_stage_${i}`);
+    for (const it of ITEM_LIST) if (!it.block) names.add(`item/${it.id}`);
     names.add('missing');
     const size = this.settings.textureRes;
     // Yield to the browser between batches so the progress bar updates

@@ -14,8 +14,6 @@ const SIZE = 64;
 export class IconRenderer {
   private readonly cache = new Map<string, string>();
   private readonly texCache = new Map<string, HTMLCanvasElement>();
-  /** Flat item sprites registered by the item texture generator (id → RGBA 16×16). */
-  readonly sprites = new Map<string, ImageData>();
 
   constructor(private readonly atlas: AtlasData) {}
 
@@ -69,8 +67,8 @@ export class IconRenderer {
     const cached = this.cache.get(key);
     if (cached) return cached;
     let url: string;
-    const sprite = this.sprites.get(itemId);
-    if (sprite) url = this.renderSprite(sprite);
+    const spriteLayer = this.atlas.index[`item/${itemId}`];
+    if (spriteLayer !== undefined) url = this.renderSprite(spriteLayer & 0xfff);
     else {
       const b = blockName ? BLOCK_BY_NAME.get(blockName) : BLOCK_BY_NAME.get(itemId);
       url = b ? this.renderBlock(b) : this.renderMissing();
@@ -79,17 +77,13 @@ export class IconRenderer {
     return url;
   }
 
-  private renderSprite(img: ImageData): string {
+  private renderSprite(layer: number): string {
     const c = document.createElement('canvas');
     c.width = SIZE;
     c.height = SIZE;
     const ctx = c.getContext('2d')!;
-    const tmp = document.createElement('canvas');
-    tmp.width = img.width;
-    tmp.height = img.height;
-    tmp.getContext('2d')!.putImageData(img, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tmp, 0, 0, SIZE, SIZE);
+    ctx.drawImage(this.textureCanvas(layer, 0xffffff), 0, 0, SIZE, SIZE);
     return c.toDataURL();
   }
 

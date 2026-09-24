@@ -5,6 +5,7 @@
  */
 import { Painter, finalize } from './painter';
 import { paintBlockTexture, ANIMATED } from './blocktex';
+import { paintItemTexture } from './itemtex';
 
 export interface AtlasData {
   size: number;
@@ -87,7 +88,8 @@ export function buildAtlas(names: string[], size: number, progress?: BuildProgre
   for (const item of plan) {
     for (let f = 0; f < item.frames; f++) {
       const p = new Painter(size, item.name, f);
-      if (!paintBlockTexture(p, item.name)) {
+      const painted = item.name.startsWith('item/') ? paintItemTexture(p, item.name.slice(5)) : paintBlockTexture(p, item.name);
+      if (!painted) {
         if (f === 0) missing.push(item.name);
         missingTexture(p);
       }
