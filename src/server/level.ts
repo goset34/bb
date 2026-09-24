@@ -21,6 +21,7 @@ import { GenService } from './gen';
 import { ChunkGenerator } from '../common/worldgen/generator';
 import { TickQueue } from './ticks';
 import type { BlockEntityData } from '../common/world/chunk';
+import { EntityGrid } from './entity/spatial';
 import type { ItemStack } from '../common/item/stack';
 import { AABB } from '../common/math/geom';
 import type { PhysicsWorld } from '../common/entity/physics';
@@ -59,6 +60,8 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
   skyDarken = 0;
   /** Extension hooks for later milestones (redstone wire cache, raids, dragon fight…). */
   readonly systems: Array<{ name: string; tick(level: ServerLevel): void }> = [];
+  /** Spatial index of entities (rebuilt every tick before entity ticking). */
+  readonly grid = new EntityGrid();
   /** Entity breaking the block currently being removed (transient, for drop decisions). */
   breaker: Entity | null = null;
   /** Per-tick timing (ms) for the profiler. */
@@ -86,6 +89,7 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
     this.chunks = new ChunkManager(this.dim, seed, gen, generator, store, {
       onFull: (h) => this.onChunkFull(h),
       onUnload: (h) => this.onChunkUnload(h),
+      beforeSave: (h) => this.server.hooks.chunkSaving(this, h.chunk!),
       light: (h) => {
         this.light.invalidateCache();
         this.light.initChunk(h.chunk!, () => { h.lightReady = true; });
@@ -512,6 +516,7 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
 
   addFreshEntity(e: Entity): boolean {
     this.entities.add(e);
+    if (this.grid.builtAt === this.getGameTime()) this.grid.insert(e);
     this.server.hooks.entityAdded(this, e);
     return true;
   }
@@ -521,6 +526,7 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
   }
 
   getEntities(box: AABB, filter?: (e: Entity) => boolean, except?: Entity): Entity[] {
+    if (this.grid.builtAt === this.getGameTime()) return this.grid.query(box, filter, except);
     const out: Entity[] = [];
     for (const e of this.entities.all()) {
       if (e === except || e.removed) continue;
@@ -698,7 +704,10 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
     time('systems', () => {
       for (const s of this.systems) s.tick(this);
     });
-    time('entities', () => this.server.hooks.tickEntities(this));
+    time('entities', () => {
+      this.grid.rebuild(this.entities.all(), this.getGameTime());
+      this.server.hooks.tickEntities(this);
+    });
     time('light', () => {
       if (this.light.hasPending) this.light.run();
       this.light.flushChanged();

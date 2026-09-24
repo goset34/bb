@@ -690,7 +690,7 @@ export function travel(world: PhysicsWorld, e: PE & { input: MoveInput }, strafe
   const f3 = p.onGround ? friction * 0.91 : 0.91;
   const speed = p.onGround
     ? inp.speed * inp.speedModifier * opts.speedMultiplier * (inp.sprinting ? 1.3 : 1) * (0.21600002 / (friction * friction * friction))
-    : (e.type === 'player' ? (inp.sprinting ? 0.025999999 : 0.02) : 0.02);
+    : (e.type === 'player' ? (inp.sprinting ? 0.025999999 : 0.02) : inp.airSpeed ?? 0.02);
   moveRelative(e, speed, strafe, up, forward);
   // Climbing
   const climbing = onClimbable(world, e);

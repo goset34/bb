@@ -22,6 +22,7 @@ import { tickRecipes, recipeCrafted, sendAllRecipes, saveRecipes, loadRecipes } 
 import { useBed, wakeUp, tickSleep, sleepingOf } from './sleep';
 import { dropContainerContents, shellBoxDrop, restoreContainer, furnaceSystem, isContainerBE, voidChestOf } from './containers';
 import { popResource } from './interaction';
+import { restoreChunkEntities, storeChunkEntities } from '../entity/persistence';
 import type { SerializedStack } from '../../common/item/stack';
 
 function playerOf(server: StrataServer, e: Entity): ServerPlayer | undefined {
@@ -134,6 +135,11 @@ function install(server: StrataServer): void {
   };
 
   for (const level of server.levels.values()) level.systems.push(furnaceSystem(level));
+  // Entity persistence with chunks
+  const prevLoaded = h.chunkLoaded, prevUnloading = h.chunkUnloading, prevSaving = h.chunkSaving;
+  h.chunkLoaded = (level, c) => { prevLoaded(level, c); restoreChunkEntities(level, c); };
+  h.chunkUnloading = (level, c) => { prevUnloading(level, c); storeChunkEntities(level, c, true); };
+  h.chunkSaving = (level, c) => { prevSaving(level, c); storeChunkEntities(level, c, false); };
   const prevBERemoved = h.blockEntityRemoved;
   h.blockEntityRemoved = (level, be, oldState, suppress) => {
     prevBERemoved(level, be, oldState, suppress);

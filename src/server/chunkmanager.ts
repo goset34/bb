@@ -49,6 +49,8 @@ export interface ChunkManagerHooks {
   onUnload(h: Holder): void;
   /** Called to light a chunk. */
   light(h: Holder): void;
+  /** Called for FULL chunks before an autosave (persist entities). */
+  beforeSave?(h: Holder): void;
 }
 
 export interface Ticket {
@@ -246,6 +248,7 @@ export class ChunkManager {
     let n = 0;
     const jobs: Promise<void>[] = [];
     for (const h of this.holders.values()) {
+      if (h.chunk && h.status === ChunkStatus.FULL) this.hooks.beforeSave?.(h);
       if (h.chunk && h.chunk.dirty && h.status >= ChunkStatus.NOISE) {
         h.chunk.dirty = false;
         jobs.push(this.store.save(this.dim.id, h.x, h.z, serializeChunk(h.chunk)));

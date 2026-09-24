@@ -4,6 +4,7 @@
  */
 import { Painter, RGB, RGBA, hex, mix, shade } from './painter';
 import { DYE } from './blocktex';
+import { MOBS } from '../../../common/entity/mobs';
 
 // ---------------------------------------------------------------------------------------------
 // Masks. Legend: '.' empty · o outline · d dark · m mid · l light · w highlight (material colour)
@@ -314,6 +315,24 @@ const M: Record<string, string[]> = {
     '.d.dmmmdmdmd.d..',
     '...d.d.d.d.d....',
     '................',
+    '................',
+  ],
+  spawn_egg: [
+    '................',
+    '.......oo.......',
+    '......olmo......',
+    '.....olmsmo.....',
+    '.....ollmmo.....',
+    '....olmmsmmo....',
+    '....olmmmmmo....',
+    '...olsmmmmsmo...',
+    '...olmmmmmmdo...',
+    '...olmmsmmmdo...',
+    '...ommmmmmsdo...',
+    '...osmmmmmmdo...',
+    '....ommmsmdo....',
+    '.....oddddo.....',
+    '......oooo......',
     '................',
   ],
   ball: [
@@ -1678,6 +1697,12 @@ def('item_frame', (p) => mask(p, 'frame', { o: hex('#3a2a1a'), h: hex('#9a7448')
 def('glow_item_frame', (p) => mask(p, 'frame', { o: hex('#10302a'), h: hex('#3fc0a0'), k: hex('#2a8a74'), x: hex('#8a6a4a') }));
 def('verge_crystal', (p) => mask(p, 'crystal', { ...ramp(hex('#d8b4f0')), a: hex('#c080f0'), x: hex('#f0e0ff'), y: hex('#3a2a4a') }));
 
+rule(/^(.+)_spawn_egg$/, (p, m) => {
+  const info = MOBS.get(m[1]!);
+  const base: RGB = info?.egg ? [(info.egg[0] >> 16) & 255, (info.egg[0] >> 8) & 255, info.egg[0] & 255] : [128, 128, 128];
+  const spot: RGB = info?.egg ? [(info.egg[1] >> 16) & 255, (info.egg[1] >> 8) & 255, info.egg[1] & 255] : [60, 60, 60];
+  mask(p, 'spawn_egg', { o: shade(base, 0.45), l: shade(base, 1.25), m: base, d: shade(base, 0.75), s: spot });
+});
 rule(/^(.+)_pottery_sherd$/, (p, m) => {
   mask(p, 'sherd', { ...ramp(hex('#a4553a')), a: hex('#6a3020'), x: hex('#6a3020') });
   // unique motif per sherd

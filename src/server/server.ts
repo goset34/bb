@@ -102,6 +102,8 @@ export interface ServerHooks {
   tickChunk(level: ServerLevel, c: Chunk): void;
   chunkLoaded(level: ServerLevel, c: Chunk): void;
   chunkUnloading(level: ServerLevel, c: Chunk): void;
+  /** Autosave of a loaded chunk (persist its entities without removing them). */
+  chunkSaving(level: ServerLevel, c: Chunk): void;
   chunkSent(p: ServerPlayer, cx: number, cz: number): void;
   forcedTickets(level: ServerLevel): Ticket[];
   blockEntityClientData(be: BlockEntityData): Record<string, unknown> | null;
@@ -159,6 +161,7 @@ function defaultHooks(server: StrataServer): ServerHooks {
     tickChunk() {},
     chunkLoaded() {},
     chunkUnloading() {},
+    chunkSaving() {},
     chunkSent() {},
     forcedTickets: () => [],
     blockEntityClientData: (be) => be.data,

@@ -98,6 +98,8 @@ export interface MoveInput {
   usingItem: boolean;
   /** Mob navigation writes a target speed multiplier. */
   speedModifier: number;
+  /** Acceleration while airborne for non-player entities (default 0.02; flying mobs use their speed). */
+  airSpeed?: number;
 }
 
 export interface ItemEntityData {

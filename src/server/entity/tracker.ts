@@ -26,6 +26,12 @@ export const metaProviders: Array<(e: Entity, meta: Record<string, unknown>) => 
   },
 ];
 
+/** Yaw sent to clients: body rotation for mobs (movement heading stays server-side). */
+function netYaw(e: Entity): number {
+  const t = e.transform!;
+  return e['mob'] ? t.bodyYaw : t.yaw;
+}
+
 function spawnMeta(e: Entity): Record<string, unknown> {
   const m: Record<string, unknown> = {};
   for (const p of metaProviders) p(e, m);
@@ -81,7 +87,7 @@ export class EntityTracker {
   sendSpawn(p: ServerPlayer, e: Entity): void {
     const t = e.transform!, ph = e.physics;
     p.send({
-      type: 'spawnEntity', id: e.id, etype: e.type, x: t.x, y: t.y, z: t.z, yaw: t.yaw, pitch: t.pitch, headYaw: t.headYaw,
+      type: 'spawnEntity', id: e.id, etype: e.type, x: t.x, y: t.y, z: t.z, yaw: netYaw(e), pitch: t.pitch, headYaw: t.headYaw,
       vx: ph?.vx ?? 0, vy: ph?.vy ?? 0, vz: ph?.vz ?? 0, meta: spawnMeta(e),
     });
     const eq = visibleEquipment(e);
@@ -118,12 +124,13 @@ export class EntityTracker {
       if (n.trackers.size === 0) continue;
       // Movement
       const moved = Math.abs(t.x - n.lastX) > 1e-3 || Math.abs(t.y - n.lastY) > 1e-3 || Math.abs(t.z - n.lastZ) > 1e-3;
-      const rotated = Math.abs(t.yaw - n.lastYaw) > 0.5 || Math.abs(t.pitch - n.lastPitch) > 0.5 || Math.abs(t.headYaw - n.lastHeadYaw) > 0.5;
+      const yaw = netYaw(e);
+      const rotated = Math.abs(yaw - n.lastYaw) > 0.5 || Math.abs(t.pitch - n.lastPitch) > 0.5 || Math.abs(t.headYaw - n.lastHeadYaw) > 0.5;
       const due = (now + e.id) % n.updateInterval === 0;
       if (n.forceSync || ((moved || rotated) && (due || e.type === 'player' || n.updateInterval <= 3)) || (due && now % 60 === 0)) {
-        const packet = { type: 'entityMove', id: e.id, x: t.x, y: t.y, z: t.z, yaw: t.yaw, pitch: t.pitch, headYaw: t.headYaw, onGround: !!e.physics?.onGround, tick: now };
+        const packet = { type: 'entityMove', id: e.id, x: t.x, y: t.y, z: t.z, yaw, pitch: t.pitch, headYaw: t.headYaw, onGround: !!e.physics?.onGround, tick: now };
         for (const id of n.trackers) this.playerById(id)?.send(packet);
-        n.lastX = t.x; n.lastY = t.y; n.lastZ = t.z; n.lastYaw = t.yaw; n.lastPitch = t.pitch; n.lastHeadYaw = t.headYaw;
+        n.lastX = t.x; n.lastY = t.y; n.lastZ = t.z; n.lastYaw = yaw; n.lastPitch = t.pitch; n.lastHeadYaw = t.headYaw;
         n.forceSync = false;
         if (e.physics && e.type !== 'player') {
           const vp = { type: 'entityVelocity', id: e.id, vx: e.physics.vx, vy: e.physics.vy, vz: e.physics.vz };

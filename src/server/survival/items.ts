@@ -5,7 +5,8 @@
 import type { Entity } from '../../common/entity/ecs';
 import { makePhysics, makeTransform } from '../../common/entity/components';
 import { tickItemPhysics } from '../../common/entity/physics';
-import { ItemStack } from '../../common/item/stack';
+import { ItemStack, SerializedStack } from '../../common/item/stack';
+import { ENTITY_CODECS } from '../entity/persistence';
 import { getItem } from '../../common/item/items';
 import { addXpPoints, orbValues } from '../../common/entity/living';
 import { stateFlags, F, blockOf } from '../../common/block/registry';
@@ -217,3 +218,31 @@ export function dropFromPlayer(level: ServerLevel, p: ServerPlayer, stack: ItemS
   if (e?.item) e.item.thrower = p.entity.id;
   return e;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Persistence
+// ---------------------------------------------------------------------------------------------
+
+ENTITY_CODECS.set('item', {
+  save: (e) => ({ item: e.item!.stack.toJSON(), age: e.item!.age, pickupDelay: e.item!.pickupDelay }),
+  load: (level, s) => {
+    const stack = ItemStack.fromJSON(s.data['item'] as SerializedStack);
+    if (stack.isEmpty()) return null;
+    const e = createItemEntity(level, s.pos[0], s.pos[1], s.pos[2], stack, 0, 0, 0, (s.data['pickupDelay'] as number) ?? 0);
+    if (!e) return null;
+    level.entities.remove(e);
+    e.item!.age = (s.data['age'] as number) ?? 0;
+    return e;
+  },
+});
+
+ENTITY_CODECS.set('xp_orb', {
+  save: (e) => ({ value: e.xpOrb!.value, age: e.xpOrb!.age, count: e.xpOrb!.count }),
+  load: (level, s) => {
+    const e = createXpOrb(level, s.pos[0], s.pos[1], s.pos[2], (s.data['value'] as number) ?? 1);
+    level.entities.remove(e);
+    e.xpOrb!.age = (s.data['age'] as number) ?? 0;
+    e.xpOrb!.count = (s.data['count'] as number) ?? 1;
+    return e;
+  },
+});

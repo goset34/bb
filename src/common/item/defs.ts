@@ -2,6 +2,7 @@
  * Non-block items: tools and weapons of every tier, armor, food, materials, buckets, vehicles,
  * music discs, templates, sherds… Stats follow the reference game's mechanics.
  */
+import { MOBS, spawnEggOf } from '../entity/mobs';
 import { registerItem, ItemDef, ToolTier, ToolType, ArmorInfo, FoodInfo, ITEMS } from './items';
 import { COLORS } from '../block/defs/helpers';
 
@@ -79,6 +80,7 @@ function food(id: string, nutrition: number, satMod: number, extra: Partial<Food
 }
 
 export function registerItems(): void {
+  for (const m of MOBS.values()) if (m.egg) item(spawnEggOf(m.id), { category: 'spawn_eggs' });
   // ---- tools and weapons ----------------------------------------------------------------------
   for (const [tierName, tier] of Object.entries(TIERS)) {
     for (const type of ['sword', 'shovel', 'pickaxe', 'axe', 'hoe'] as ToolType[]) {

@@ -384,7 +384,7 @@ function lookRay(p: ServerPlayer, fluids: 'none' | 'source' | 'any'): BlockHit |
 }
 
 /** Replace the used item by `result` (keeps one in creative if missing). */
-function exchange(p: ServerPlayer, hand: 'main' | 'off', stack: ItemStack, result: ItemStack): void {
+export function exchange(p: ServerPlayer, hand: 'main' | 'off', stack: ItemStack, result: ItemStack): void {
   const inv = p.inventory;
   const slot = heldSlot(p, hand);
   if (p.data.gameMode === 'creative') {

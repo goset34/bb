@@ -54,6 +54,8 @@ export const livingHooks = {
     }
     return [inv.mainHand, inv.get(INV_OFFHAND)];
   },
+  /** Adjust incoming damage before it is applied (mob immunities, weaknesses); 0 cancels. */
+  adjustDamage: (_level: ServerLevel, _e: Entity, _type: string, amount: number, _attacker: Entity | null): number => amount,
   /** Damage an item held/worn by the entity (players lose the item when it breaks). */
   damageItem: (_level: ServerLevel, _e: Entity, _stack: ItemStack, _amount: number): void => {},
 };
@@ -134,6 +136,7 @@ export function hurt(level: ServerLevel, e: Entity, type: string, amount: number
     const armor = livingHooks.armorItems(e);
     if (armor.some((s) => s.id.startsWith('leather_'))) return false;
   }
+  amount = livingHooks.adjustDamage(level, e, type, amount, attacker);
   if (player && info.scalesWithDifficulty) amount = scaleByDifficulty(amount, level.getDifficulty());
   if (type === 'withering' && amount === 0) return false;
   if (amount <= 0) return false;
