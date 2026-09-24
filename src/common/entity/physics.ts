@@ -317,6 +317,8 @@ export function jumpFactorAt(world: BlockGetter, t: Transform): number {
 }
 
 export function onClimbable(world: BlockGetter, e: PE): boolean {
+  // Wall climbers (spiders) climb whatever they bump into
+  if ((e as { climbing?: boolean }).climbing) return true;
   const t = e.transform;
   const x = Math.floor(t.x), y = Math.floor(t.y), z = Math.floor(t.z);
   const st = world.getBlockState(x, y, z);

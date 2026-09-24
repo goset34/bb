@@ -2,6 +2,7 @@
 import {
   reg, cube, cubeBT, pillar, slab, stairs, wall, fence, button, pressurePlate, door, trapdoor, stoneLike, metalLike, P,
   shapeOf, model, box, crossElements, BlockSettings, facingRot, rotateModel,
+  multiface,
 } from './helpers';
 import { cubeTex, Element } from '../model';
 import { paneElements, paneShape, lanternElements, lanternShape, torchElements, wallTorchElements } from '../shapes';
@@ -110,6 +111,7 @@ export function registerBuilding(): void {
 
   // ---- resin (pale garden) ---------------------------------------------------------------------
   cube('resin_block', { hardness: 0, sound: 'resin', map: 'terracotta_orange' });
+  multiface('resin_clump', { hardness: 0, sound: 'resin', map: 'terracotta_orange' });
   cube('resin_bricks', stoneLike(1.5, 6, { sound: 'resin_bricks', map: 'terracotta_orange' }));
   cube('chiseled_resin_bricks', stoneLike(1.5, 6, { sound: 'resin_bricks', map: 'terracotta_orange' }));
   stairs('resin_brick_stairs', 'resin_bricks', stoneLike(1.5, 6, { sound: 'resin_bricks' }));

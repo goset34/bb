@@ -139,6 +139,8 @@ export interface MobDef {
   pickUp?(m: Mob, item: Entity): void;
   /** Items this mob may hold at all. */
   canHoldItem?(m: Mob, stack: ItemStack): boolean;
+  /** Melee hits always disable a blocking shield (wardens, ravagers). */
+  disablesShield?: boolean;
   /** Extra hostile targeting rule (pets sparing their owner's other pets…). */
   canAttack?(m: Mob, target: Entity): boolean;
 }

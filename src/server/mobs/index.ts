@@ -25,6 +25,12 @@ import { genericInteract, feedAnimal, useItem, handStack, setAge } from './actio
 import { tickShoulders, releaseShoulders, saveShoulders, loadShoulders } from './defs/parrot';
 import { sleepingOf } from '../survival/sleep';
 import { useSteeringItem } from './steering';
+import { dispatchVibration, trackMovementVibrations } from './vibrations';
+import { tickWarning } from './defs/deepdark';
+import { groanerHeartSystem, heartBroken } from './defs/special';
+import { explosionHooks } from '../combat/explosion';
+import { blockOf } from '../../common/block/registry';
+import { fromBucket, axolotlAssist } from './defs/aquatic';
 import { harvestHive, hiveBroken, hivePlaced, hiveSystem } from './defs/bees';
 import { recordPlayerAttack, petDeathMessage, ownerPlayer } from './tamable';
 import { leashInteract, knotInteract, dropLeash, leashToFence, leashSave, detachPlayerLeashes } from './leash';
@@ -265,10 +271,11 @@ function install(server: StrataServer): void {
   const prevCreate = h.createEntity;
   h.createEntity = (level, type, x, y, z, opts) => {
     if (!MOB_DEFS.has(type)) return prevCreate(level, type, x, y, z, opts);
-    const reason = (opts['reason'] as SpawnReason | undefined) ?? (opts['worldgen'] ? 'chunk_generation' : 'command');
+    const reason = (opts['reason'] as SpawnReason | undefined) ?? (opts['fromBucket'] ? 'bucket' : opts['worldgen'] ? 'chunk_generation' : 'command');
     const m = spawnMob(level, type, x, y, z, reason, opts);
     if (!m) return null;
     applySpawnData(m, opts);
+    if (opts['fromBucket']) fromBucket(m, (opts['bucketData'] as Record<string, unknown> | undefined) ?? {});
     if (opts['worldgen'] || reason === 'structure') m.setPersistent();
     return m.e;
   };
@@ -296,6 +303,7 @@ function install(server: StrataServer): void {
   livingHooks.onHurt = (level, e, type, amount, attacker) => {
     prevHurt(level, e, type, amount, attacker);
     if (attacker && attacker !== e) recordPlayerAttack(level, attacker, e);
+    if (e.transform) dispatchVibration(level, 'entity_damage', e.transform.x, e.transform.y, e.transform.z, e);
     if (e.player) {
       const sp = level.players.find((pl) => pl.entity === e);
       if (sp) releaseShoulders(sp);
@@ -319,12 +327,14 @@ function install(server: StrataServer): void {
   const prevDeath = livingHooks.onDeath;
   livingHooks.onDeath = (level, e, type, attacker) => {
     prevDeath(level, e, type, attacker);
+    if (e.transform) dispatchVibration(level, 'entity_die', e.transform.x, e.transform.y, e.transform.z, e);
     if (e.player) {
       const sp = level.players.find((pl) => pl.entity === e);
       if (sp) releaseShoulders(sp, true);
     }
     const killer = mobOf(attacker);
     if (killer && attacker !== e) killer.def.onKill?.(killer, e);
+    axolotlAssist(level, e, attacker);
     if (vehicleOf(e)) stopRiding(level, e);
     if (passengersOf(e).length) ejectPassengers(level, e);
     const m = mobOf(e);
@@ -368,17 +378,29 @@ function install(server: StrataServer): void {
   const prevUseOn = h.useItemOn;
   h.useItemOn = (p, hand, stack, x, y, z, face, hx, hy, hz) => prevUseOn(p, hand, stack, x, y, z, face, hx, hy, hz) || useEggOnBlock(p, hand, stack, x, y, z, face)
     || (hand === 'main' && !p.entity.input.sneaking && leashToFence(p, x, y, z)) || harvestHive(p, hand, x, y, z);
+  // Infested blocks release a silverfish when broken without silk touch or blown up
+  const prevAfterBreak = h.afterBreak;
+  h.afterBreak = (p, x, y, z, state) => {
+    prevAfterBreak(p, x, y, z, state);
+    if (blockOf(state).name.startsWith('infested_') && p.inventory.mainHand.getEnchant('silk_touch') <= 0) spawnSilverfishAt(p.level, x, y, z);
+  };
+  const prevExploded = explosionHooks.blockExploded;
+  explosionHooks.blockExploded = (level, x, y, z, state, source) => {
+    prevExploded(level, x, y, z, state, source);
+    if (blockOf(state).name.startsWith('infested_')) spawnSilverfishAt(level, x, y, z);
+  };
   const prevBERemoved = h.blockEntityRemoved;
   h.blockEntityRemoved = (level, be, oldState, suppress) => {
     prevBERemoved(level, be, oldState, suppress);
     if (be.type === 'beehive') hiveBroken(level, be, oldState, level.breaker);
+    if (be.type === 'groaner_heart') heartBroken(level, be.data);
   };
   const prevPlaced = h.blockPlaced;
   h.blockPlaced = (p, x, y, z, state, stack, hand) => {
     prevPlaced(p, x, y, z, state, stack, hand);
     if (stack.data.bees || stack.data.honey) hivePlaced(p.level, x, y, z, stack);
   };
-  for (const level of server.levels.values()) level.systems.push(hiveSystem(level));
+  for (const level of server.levels.values()) level.systems.push(hiveSystem(level), groanerHeartSystem(level));
   const prevUse = h.useItem;
   h.useItem = (p, hand) => prevUse(p, hand) || useEggInAir(p, hand) || useSteeringItem(p, hand);
 
@@ -417,6 +439,13 @@ function install(server: StrataServer): void {
   h.playerTick = (p) => {
     prevPTick(p);
     tickShoulders(p, !!sleepingOf(p));
+    if (!p.entity.living?.dead) trackMovementVibrations(p.level, p.entity);
+    tickWarning(p);
+  };
+  const prevGameEvent = h.gameEvent;
+  h.gameEvent = (level, type, x, y, z, source, state) => {
+    prevGameEvent(level, type, x, y, z, source, state);
+    dispatchVibration(level, type, x, y, z, source);
   };
   const prevSaveP = h.savePlayer;
   h.savePlayer = (p) => {
@@ -460,3 +489,9 @@ function install(server: StrataServer): void {
 }
 
 registerGameplayModule(install);
+
+function spawnSilverfishAt(level: ServerLevel, x: number, y: number, z: number): void {
+  if (level.getGameRule('doTileDrops') === false) return;
+  const e = level.createEntity('silverfish', x + 0.5, y, z + 0.5, { reason: 'triggered' });
+  mobOf(e)?.broadcastEvent('poof');
+}

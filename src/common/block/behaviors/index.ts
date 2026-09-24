@@ -104,7 +104,7 @@ function resolve(b: Block): BlockBehavior {
   if (n === 'firefly_bush') return new PlantBehavior(SUPPORT.firefly!);
   if (n === 'cocoa') return new CocoaBehavior();
   if (n === 'vine') return new VineBehavior();
-  if (n === 'glow_lichen' || n === 'echo_vein') return new MultifaceBehavior();
+  if (n === 'glow_lichen' || n === 'echo_vein' || n === 'resin_clump') return new MultifaceBehavior();
   if (n === 'cave_vines' || n === 'cave_vines_plant') return new HangingPlantBehavior((a) => isFaceSturdy(a, 0) || blockOf(a).name.startsWith('cave_vines'));
   if (n === 'weeping_vines' || n === 'weeping_vines_plant') return new HangingPlantBehavior((a) => isFaceSturdy(a, 0) || blockOf(a).name.startsWith('weeping_vines') || hasTag(a, 'leaves'));
   if (n === 'twisting_vines' || n === 'twisting_vines_plant') return new PlantBehavior((below) => isFaceSturdy(below, 1) || blockOf(below).name.startsWith('twisting_vines'));

@@ -425,6 +425,7 @@ def('basalt_top', (p) => { stone(p, hex('#57575e'), { variance: 0.06 }); p.each(
 def('polished_basalt_side', (p) => { noiseFill(p, hex('#5a5a61'), 0.04, 0.03); p.each((x, y, u) => { if (u % 4 < 0.6) p.set(x, y, hex('#44444a'), 0.3); }); });
 def('polished_basalt_top', (p) => polished(p, hex('#5d5d64')));
 def('smooth_basalt', (p) => polished(p, hex('#48474d')));
+def('resin_clump', (p) => { clear(p); markNoTint(p); for (let i = 0; i < 9; i++) blob(p, 2 + p.rnd(i, 0, 3) * 12, 2 + p.rnd(i, 1, 3) * 12, 1.4 + p.rnd(i, 2, 3), hex('#d9661f')); speckle(p, [hex('#f59a3b'), hex('#9e420f')], 0.25); p.material({ smooth: 0.7 }); });
 def('resin_block', (p) => { noiseFill(p, hex('#d9661f'), 0.06, 0.1); speckle(p, [hex('#f59a3b'), hex('#b84f12')], 0.2); p.material({ smooth: 0.7 }); });
 def('resin_bricks', (p) => bricks(p, hex('#ce5f1a'), hex('#8e3e0f'), { rows: 4, cols: 2 }));
 def('chiseled_resin_bricks', (p) => chiseledPattern(p, hex('#ce5f1a'), hex('#8e3e0f')));
@@ -1083,7 +1084,7 @@ def('heavy_core', (p) => { metalBlock(p, hex('#4a4d52'), { rivets: true }); cent
 rule(/^dried_ghast_(top|bottom|side|face)$/, (p, m) => { noiseFill(p, hex('#b8b0aa'), 0.08, 0.1); crack(p, hex('#8a847e')); if (m[1] === 'face') { p.fillRect(3, 5, 6, 8, hex('#3a3a3a')); p.fillRect(10, 5, 13, 8, hex('#3a3a3a')); p.fillRect(6, 10, 10, 12, hex('#3a3a3a')); } });
 
 // ---------------------------------------------------------------------------------------------
-// Echo (sculk) family
+// Echo family
 // ---------------------------------------------------------------------------------------------
 function echoBase(p: Painter): void {
   const f = p.frame;
@@ -1120,7 +1121,7 @@ rule(/^echo_sensor_tendril_(active|inactive)$/, (p, m) => { clear(p); markNoTint
 // ---------------------------------------------------------------------------------------------
 // Creaking heart, misc
 // ---------------------------------------------------------------------------------------------
-rule(/^creaking_heart(_top)?(_awake|_dormant)?$/, (p, m) => {
+rule(/^groaner_heart(_top)?(_awake|_dormant)?$/, (p, m) => {
   const [b, d] = BARK.pale_oak!;
   if (m[1]) logTop(p, PLANKS.pale_oak!, shade(PLANKS.pale_oak!, 0.8), b); else bark(p, b, d);
   if (m[2]) p.each((x, y, u, v) => {

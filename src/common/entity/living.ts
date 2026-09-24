@@ -227,6 +227,7 @@ export const DAMAGE_TYPES: Record<string, DamageTypeInfo> = {
   wind_charge: { exhaustion: 0.1 },
   sting: { exhaustion: 0.1 },
   ender_pearl: { bypassArmor: true, isFall: true, exhaustion: 0 },
+  dry_out: { noKnockback: true, exhaustion: 0 },
 };
 
 export function damageInfo(type: string): DamageTypeInfo {

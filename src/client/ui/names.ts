@@ -106,7 +106,7 @@ const EXACT_ES: Record<string, string> = {
   trial_spawner: 'Generador de desafío', vault: 'Bóveda', decorated_pot: 'Vasija decorada', chiseled_bookshelf: 'Librería cincelada',
   sea_lantern: 'Linterna marina', prismarine: 'Prismarina', purpur_block: 'Bloque de púrpur', quartz_block: 'Bloque de cuarzo',
   jack_o_lantern: 'Calabaza iluminada', carved_pumpkin: 'Calabaza tallada', farmland: 'Tierra de cultivo', dirt_path: 'Camino de tierra',
-  powder_snow: 'Nieve en polvo', frogspawn: 'Huevas de rana', resin_block: 'Bloque de resina', creaking_heart: 'Corazón crujidor',
+  powder_snow: 'Nieve en polvo', frogspawn: 'Huevas de rana', resin_block: 'Bloque de resina', groaner_heart: 'Corazón gruñidor',
 };
 
 export function spanishName(id: string): string {

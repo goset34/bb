@@ -549,7 +549,7 @@ function darkOakTree(wood: 'dark_oak' | 'pale_oak'): Shape {
       if (r.nextInt(10) === 0) {
         const hy = y + r.nextIntBetween(2, Math.max(2, h - 3));
         const k = key(cx - t.ox, hy - t.oy, cz - t.oz);
-        if (t.logs.has(k)) t.logs.set(k, B('creaking_heart[natural=true]'));
+        if (t.logs.has(k)) t.logs.set(k, B('groaner_heart[natural=true]'));
       }
     }
     return true;

@@ -125,12 +125,20 @@ export class FrogspawnBehavior extends BlockBehavior {
   }
 }
 
+/** Shriekers fall silent after their scream (the server schedules this tick when they shriek). */
+export class ShriekerBehavior extends BlockBehavior {
+  override tick(state: number, level: LevelAccess, x: number, y: number, z: number): void {
+    if (getValue(state, P.shrieking)) level.setBlock(x, y, z, setValue(state, P.shrieking, false), 3);
+  }
+}
+
 export function registerEggBehaviors(): void {
   registerBehaviorResolver((b) => {
     switch (b.name) {
       case 'turtle_egg': return new TurtleEggBehavior();
       case 'sniffer_egg': return new SnifferEggBehavior();
       case 'frogspawn': return new FrogspawnBehavior();
+      case 'echo_shrieker': return new ShriekerBehavior();
       default: return null;
     }
   });

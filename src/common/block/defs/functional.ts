@@ -356,9 +356,9 @@ export function registerFunctional(): void {
     reg(n, [P.railShapeStraight, P.powered, P.waterlogged], { hardness: 0.7, collision: false, sound: 'metal', map: 'none', layer: 'cutout', occludes: false, tags: ['rails'], model: (s) => model(railElements(s.get(P.powered) ? `${n}_on` : n, s.get(P.railShapeStraight)), false), outline: (s) => railOutline(s.get(P.railShapeStraight)) });
   }
   // Sculk (echo) family
-  cube('echo_moss', { hardness: 0.2, tool: 'hoe', sound: 'sculk', map: 'color_black' });
+  cube('echo_moss', { hardness: 0.2, tool: 'hoe', sound: 'echo_moss', map: 'color_black' });
   reg('echo_vein', [P.down, P.up, P.north, P.south, P.west, P.east, P.waterlogged], {
-    hardness: 0.2, tool: 'hoe', collision: false, replaceable: true, sound: 'sculk_vein', map: 'color_black', layer: 'cutout', push: 'destroy', occludes: false,
+    hardness: 0.2, tool: 'hoe', collision: false, replaceable: true, sound: 'echo_vein', map: 'color_black', layer: 'cutout', push: 'destroy', occludes: false,
     model: (s) => {
       const f = [s.get(P.down), s.get(P.up), s.get(P.north), s.get(P.south), s.get(P.west), s.get(P.east)];
       const els: Element[] = [];
@@ -366,14 +366,14 @@ export function registerFunctional(): void {
       return model(els, false);
     },
   });
-  reg('echo_catalyst', [P.bloom], { hardness: 3, resistance: 3, tool: 'hoe', sound: 'sculk_catalyst', map: 'color_black', light: 6, blockEntity: 'echo_catalyst', model: (s) => ({ kind: 'cube', tex: ['echo_catalyst_bottom', s.get(P.bloom) ? 'echo_catalyst_top_bloom' : 'echo_catalyst_top', 'echo_catalyst_side', 'echo_catalyst_side', 'echo_catalyst_side', 'echo_catalyst_side'] }) });
-  reg('echo_shrieker', [P.shrieking, P.waterlogged, P.canSummon], { hardness: 3, resistance: 3, tool: 'hoe', sound: 'sculk_shrieker', map: 'color_black', occludes: false, blockEntity: 'echo_shrieker', model: () => model([box([0, 0, 0], [16, 8, 16], { 0: 'echo_shrieker_bottom', 1: 'echo_shrieker_top', 2: 'echo_shrieker_side', 3: 'echo_shrieker_side', 4: 'echo_shrieker_side', 5: 'echo_shrieker_side' }), box([1, 8, 1], [15, 15, 15], 'echo_shrieker_inner', { cullEdges: false })]), shape: () => shapeOf([0, 0, 0, 16, 8, 16]) });
+  reg('echo_catalyst', [P.bloom], { hardness: 3, resistance: 3, tool: 'hoe', sound: 'echo_catalyst', map: 'color_black', light: 6, blockEntity: 'echo_catalyst', model: (s) => ({ kind: 'cube', tex: ['echo_catalyst_bottom', s.get(P.bloom) ? 'echo_catalyst_top_bloom' : 'echo_catalyst_top', 'echo_catalyst_side', 'echo_catalyst_side', 'echo_catalyst_side', 'echo_catalyst_side'] }) });
+  reg('echo_shrieker', [P.shrieking, P.waterlogged, P.canSummon], { hardness: 3, resistance: 3, tool: 'hoe', sound: 'echo_shrieker', map: 'color_black', occludes: false, blockEntity: 'echo_shrieker', model: () => model([box([0, 0, 0], [16, 8, 16], { 0: 'echo_shrieker_bottom', 1: 'echo_shrieker_top', 2: 'echo_shrieker_side', 3: 'echo_shrieker_side', 4: 'echo_shrieker_side', 5: 'echo_shrieker_side' }), box([1, 8, 1], [15, 15, 15], 'echo_shrieker_inner', { cullEdges: false })]), shape: () => shapeOf([0, 0, 0, 16, 8, 16]) });
   for (const [n, extra] of [['echo_sensor', []], ['calibrated_echo_sensor', [P.facing]]] as const) {
-    reg(n, [...extra, P.sculkPhase, P.power, P.waterlogged], {
-      hardness: 1.5, tool: 'hoe', sound: 'sculk_sensor', map: 'color_cyan', light: 1, occludes: false, blockEntity: n, layer: 'cutout',
+    reg(n, [...extra, P.echoPhase, P.power, P.waterlogged], {
+      hardness: 1.5, tool: 'hoe', sound: 'echo_sensor', map: 'color_cyan', light: 1, occludes: false, blockEntity: n, layer: 'cutout',
       model: (s) => model([
         box([0, 0, 0], [16, 8, 16], { 0: 'echo_sensor_bottom', 1: n === 'calibrated_echo_sensor' ? 'calibrated_echo_sensor_top' : 'echo_sensor_top', 2: 'echo_sensor_side', 3: 'echo_sensor_side', 4: 'echo_sensor_side', 5: 'echo_sensor_side' }),
-        ...crossElements(s.get(P.sculkPhase) === 'active' ? 'echo_sensor_tendril_active' : 'echo_sensor_tendril_inactive', Tint.None, 8).map((e) => ({ ...e, from: [e.from[0], 8, e.from[2]] as [number, number, number], to: [e.to[0], 16, e.to[2]] as [number, number, number] })),
+        ...crossElements(s.get(P.echoPhase) === 'active' ? 'echo_sensor_tendril_active' : 'echo_sensor_tendril_inactive', Tint.None, 8).map((e) => ({ ...e, from: [e.from[0], 8, e.from[2]] as [number, number, number], to: [e.to[0], 16, e.to[2]] as [number, number, number] })),
       ]),
       shape: () => shapeOf([0, 0, 0, 16, 8, 16]),
     });

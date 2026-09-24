@@ -89,13 +89,13 @@ export function registerWood(): void {
     else pottedPlant(`potted_${w}_sapling`, `${w}_sapling`);
   }
 
-  // Creaking heart (pale garden)
-  reg('creaking_heart', [P.axis, P.creakingState, P.natural], {
-    hardness: 10, resistance: 10, tool: 'axe', sound: 'creaking_heart', map: 'color_orange', randomTicks: true, blockEntity: 'creaking_heart',
+  // Groaner heart (pale garden)
+  reg('groaner_heart', [P.axis, P.groanerState, P.natural], {
+    hardness: 10, resistance: 10, tool: 'axe', sound: 'groaner_heart', map: 'color_orange', randomTicks: true, blockEntity: 'groaner_heart',
     model: (s) => {
-      const st = s.get(P.creakingState);
+      const st = s.get(P.groanerState);
       const suffix = st === 'awake' ? '_awake' : st === 'dormant' ? '_dormant' : '';
-      return cubeColumn(`creaking_heart_top${suffix}`, `creaking_heart${suffix}`, s.get(P.axis));
+      return cubeColumn(`groaner_heart_top${suffix}`, `groaner_heart${suffix}`, s.get(P.axis));
     },
     light: () => 0,
   });

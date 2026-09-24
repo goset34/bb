@@ -7,8 +7,9 @@ import { registerMob, Mob, MobDef, SpawnContext } from '../mob';
 import { spawnMob, updateSize } from '../factory';
 import { defaultHurtTarget } from '../actions';
 import {
-  MeleeAttackGoal, RandomStrollGoal, LookAtPlayerGoal, RandomLookAroundGoal, HurtByTargetGoal, NearestAttackableTargetGoal,
+  MeleeAttackGoal, RandomStrollGoal, LookAtPlayerGoal, RandomLookAroundGoal, HurtByTargetGoal, NearestAttackableTargetGoal, MoveToBlockGoal,
 } from '../goallib';
+import { blockOf, getBlock, getCollisionShape } from '../../../common/block/registry';
 import { populateArmor, equip, sounds } from './common';
 import { mobOf } from '../mob';
 
@@ -30,7 +31,54 @@ class ZombieAttackGoal extends MeleeAttackGoal {
   }
 }
 
+/** Zombies seek out turtle eggs and stomp them (reference ZombieAttackTurtleEggGoal / RemoveBlockGoal). */
+export class RemoveTurtleEggGoal extends MoveToBlockGoal {
+  private ticksSinceReached = 0;
+  constructor(private readonly z: Mob, speed: number, vertical: number) {
+    super(z, speed, 24, vertical);
+  }
+  override canUse(): boolean {
+    if (this.z.level.getGameRule('mobGriefing') === false) return false;
+    if (this.nextStartTick > 0) {
+      this.nextStartTick--;
+      return false;
+    }
+    this.nextStartTick = this.nextStart();
+    return this.findNearestBlock();
+  }
+  protected isValidTarget(x: number, y: number, z: number): boolean {
+    const level = this.z.level;
+    return blockOf(level.getBlockState(x, y, z)).name === 'turtle_egg' && !getCollisionShape(level.getBlockState(x, y + 1, z)).length && !getCollisionShape(level.getBlockState(x, y + 2, z)).length;
+  }
+  protected override moveTarget(): [number, number, number] {
+    return [this.blockPos[0], this.blockPos[1], this.blockPos[2]];
+  }
+  override start(): void {
+    super.start();
+    this.ticksSinceReached = 0;
+  }
+  override tick(): void {
+    super.tick();
+    const [x, y, z] = this.blockPos;
+    const level = this.z.level;
+    if (!this.reachedTarget) return;
+    const r = this.z.random;
+    if (this.ticksSinceReached > 0) {
+      const p = this.z.e.physics;
+      p.vy = 0.3;
+      if (this.ticksSinceReached % 2 === 0) level.playSound(x + 0.5, y, z + 0.5, 'entity.zombie.destroy_egg', 0.5, 0.9 + r.nextFloat() * 0.2);
+    }
+    if (this.ticksSinceReached > 60) {
+      level.removeBlock(x, y, z);
+      level.levelEvent(2001, x, y, z, getBlock('turtle_egg').defaultState);
+      level.playSound(x + 0.5, y, z + 0.5, 'block.turtle_egg.break', 0.7, 0.9 + r.nextFloat() * 0.2);
+    }
+    this.ticksSinceReached++;
+  }
+}
+
 export function zombieGoals(m: Mob): void {
+  m.goals.add(4, new RemoveTurtleEggGoal(m, 1, 3));
   m.goals.add(2, new ZombieAttackGoal(m, 1, false));
   m.goals.add(7, new RandomStrollGoal(m, 1, 120, true, true));
   m.goals.add(8, new LookAtPlayerGoal(m, 8));
@@ -102,7 +150,7 @@ export function zombieReinforcements(m: Mob, attacker: import('../../../common/e
   }
 }
 
-function zombieDef(id: string, extra: Partial<MobDef>): MobDef {
+export function zombieDef(id: string, extra: Partial<MobDef>): MobDef {
   return {
     id,
     attrs: { max_health: 20, movement_speed: 0.23, attack_damage: 3, armor: 2, follow_range: 35 },

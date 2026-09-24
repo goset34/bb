@@ -10,3 +10,7 @@ import './animals';
 import './panda';
 import './bees';
 import './frogs';
+import './aquatic';
+import './hostile';
+import './deepdark';
+import './special';

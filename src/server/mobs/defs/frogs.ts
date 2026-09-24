@@ -15,8 +15,9 @@ import {
   MoveToBlockGoal,
 } from '../goallib';
 import { PathType } from '../pathfinding';
-import { handStack, useItem, exchangeItem, resetLove } from '../actions';
+import { handStack, useItem, resetLove } from '../actions';
 import { LongJumpGoal } from './animals';
+import { bucketMob } from './aquatic';
 import { items, sounds } from './common';
 
 export const FROG_VARIANTS = ['temperate', 'warm', 'cold'] as const;
@@ -243,13 +244,7 @@ registerMob({
       m.playSound('entity.tadpole.grow_up', 0.4);
       return true;
     }
-    if (s.id === 'water_bucket') {
-      const b = new ItemStack('tadpole_bucket', 1, { entity: { growAge: m.data['growAge'] ?? 0, name: m.e['customName'] } });
-      m.playSound('item.bucket.fill_tadpole');
-      exchangeItem(p, hand, s, b);
-      m.level.entities.remove(m.e);
-      return true;
-    }
+    if (bucketMob(m, p, hand)) return true;
     return false;
   },
 });

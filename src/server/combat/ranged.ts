@@ -340,7 +340,8 @@ export function shieldBlock(level: ServerLevel, p: ServerPlayer, type: string, a
   const melee = type === 'mob_attack' || type === 'mob_attack_no_aggro' || type === 'player_attack';
   if (melee) {
     knockback(attacker, 0.5, t.x - at.x, t.z - at.z);
-    if (weapon && weapon.id.endsWith('_axe') && (attacker.player || level.random.nextFloat() < 0.25)) {
+    const disabler = !!(attacker['mob'] as { def?: { disablesShield?: boolean } } | undefined)?.def?.disablesShield;
+    if (disabler || (weapon && weapon.id.endsWith('_axe') && (attacker.player || level.random.nextFloat() < 0.25))) {
       stopUsing(p);
       setCooldown(p, 'shield', 100);
       level.broadcastEntityEvent(p.entity, 'shieldDisabled', 0);

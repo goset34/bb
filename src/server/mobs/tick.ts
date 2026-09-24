@@ -15,6 +15,7 @@ import { ItemStack } from '../../common/item/stack';
 import { tickAgeing } from './actions';
 import { tickLeash } from './leash';
 import { tickPickup } from './pickup';
+import { trackMovementVibrations } from './vibrations';
 
 /** Despawn distances per category: [instant despawn, random despawn]. */
 const DESPAWN: Record<string, [number, number] | null> = {
@@ -259,6 +260,7 @@ export function tickMob(m: Mob): void {
     pushEntities(m);
   }
   m.body.tick();
+  trackMovementVibrations(level, e);
   if (passengersOf(e).length) positionPassengers(e);
   checkDespawn(m);
 }

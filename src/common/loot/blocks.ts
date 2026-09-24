@@ -120,6 +120,14 @@ function build(b: Block): LootTable | null {
     if (/seagrass|vine$|hanging_roots|glow_lichen|nether_sprouts|twisting|weeping|pale_hanging_moss/.test(n)) return onlySilkOrShears(n.replace(/^tall_/, ''));
     return null;
   }
+  if (n === 'resin_clump') {
+    // One clump per covered face
+    const faces = apply((st, c) => {
+      st.count = [P.down, P.up, P.north, P.south, P.west, P.east].filter((f) => c.state !== undefined && tryGetValue(c.state, f) === true).length || 1;
+      return st;
+    });
+    return table(pool([entry(n, faces)], 1, when(survivesExplosion)));
+  }
   if (ORES[n] || ORES[n.replace(/^deepslate_/, '')]) {
     const base = ORES[n] ?? ORES[n.replace(/^deepslate_/, '')]!;
     return oreTable(n, base[0], base[1], base[2]);

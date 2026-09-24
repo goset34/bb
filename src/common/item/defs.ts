@@ -169,7 +169,7 @@ export function registerItems(): void {
     'gust_rod', 'ghast_tear', 'magma_cream', 'slime_ball', 'glowstone_dust', 'flux_dust', 'sugar', 'paper', 'book', 'clay_ball', 'brick', 'cinder_brick',
     'prismarine_shard', 'prismarine_crystals', 'nautilus_shell', 'heart_of_the_sea', 'echo_shard', 'disc_fragment', 'phantom_membrane', 'popped_chorus_fruit',
     'lurker_shell', 'blight_star', 'dragon_breath', 'honeycomb', 'ink_sac', 'glow_ink_sac', 'wheat', 'wheat_seeds', 'beetroot_seeds', 'melon_seeds',
-    'pumpkin_seeds', 'torchflower_seeds', 'pitcher_pod', 'cocoa_beans', 'glistering_melon_slice', 'fermented_spider_eye', 'rabbit_foot', 'resin_clump',
+    'pumpkin_seeds', 'torchflower_seeds', 'pitcher_pod', 'cocoa_beans', 'glistering_melon_slice', 'fermented_spider_eye', 'rabbit_foot',
     'resin_brick', 'trial_key', 'ominous_trial_key',
   ];
   for (const id of mats) item(id, { category: 'ingredients' });
