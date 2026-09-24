@@ -67,6 +67,8 @@ export interface PlayerPose {
   crossbowCharged?: boolean;
   /** Crossbow charge duration for the loading animation. */
   chargeTicks?: number;
+  /** Sitting on a vehicle: legs forward, arms reaching for the reins. */
+  riding?: boolean;
 }
 
 /** Reference arm poses for items used over time. */
@@ -159,6 +161,16 @@ export function posePlayer(m: PlayerModel, p: PlayerPose): void {
     m.rightLeg.y = 12.2; m.leftLeg.y = 12.2;
     m.head.y = 19.8; m.body.y = 20.8;
     m.rightArm.y = 18.8; m.leftArm.y = 18.8;
+  }
+  if (p.riding) {
+    m.rightArm.xRot += -Math.PI / 5;
+    m.leftArm.xRot += -Math.PI / 5;
+    m.rightLeg.xRot = -1.4137167;
+    m.rightLeg.yRot = Math.PI / 10;
+    m.rightLeg.zRot = 0.07853982;
+    m.leftLeg.xRot = -1.4137167;
+    m.leftLeg.yRot = -Math.PI / 10;
+    m.leftLeg.zRot = -0.07853982;
   }
   if (p.useItem) usePose(m, p);
   else if (p.crossbowCharged) {

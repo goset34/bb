@@ -85,6 +85,20 @@ SCREEN_LAYOUTS.set('generic', (m) => {
   };
 });
 
+SCREEN_LAYOUTS.set('mount', (m) => {
+  const cols = Math.max(0, (m.slots.length - 36 - 2) / 3);
+  return {
+    width: 176, height: 166,
+    decorate(panel, _m, title) {
+      panel.appendChild(label(title, 8, 6));
+      panel.appendChild(label(t('container.inventory'), 8, 72));
+      // Frame behind the mount (the chest grid is drawn by its slots)
+      panel.appendChild(h('div', { class: 'gui-portrait', style: { left: px(26), top: px(18), width: px(52), height: px(52) } }));
+      if (cols === 0) panel.appendChild(h('div', { class: 'gui-portrait', style: { left: px(79), top: px(17), width: px(90), height: px(54), opacity: '0.35' } }));
+    },
+  };
+});
+
 for (const kind of ['furnace', 'blast_furnace', 'smoker']) {
   SCREEN_LAYOUTS.set(kind, () => ({
     width: 176, height: 166,

@@ -197,7 +197,7 @@ export function renderHumanoid(ctx: RenderContext, e: ClientEntity, x: number, y
     swing: i.swinging ? Math.max(0, (i.swingTime + p) / 6) : 0, swingOffhand: i.swingOffhand,
     sneaking, holdingMain: !main.isEmpty(), holdingOff: !off.isEmpty(), using: e.data['using'] === true,
     age: i.age + p, swimming, flying: false,
-    useItem: useItem || undefined, useOffhand: e.data['useHand'] === 'off', useTicks,
+    useItem: useItem || undefined, useOffhand: e.data['useHand'] === 'off', useTicks, riding: e.data['vehicle'] !== undefined,
     crossbowCharged: (main.id === 'crossbow' && !!main.data.charged?.length) || (off.id === 'crossbow' && !!off.data.charged?.length),
     chargeTicks: 25 - 5 * (useItem === 'crossbow' ? (e.data['useHand'] === 'off' ? off : main).getEnchant('quick_charge') : 0),
   });

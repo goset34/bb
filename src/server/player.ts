@@ -279,6 +279,11 @@ export class ServerPlayer {
       if (this.data.gameMode === 'spectator') {
         e.physics.noPhysics = true;
       }
+      if (this.server.hooks.riderInput(this)) {
+        this.lastProcessedSeq = ip.seq;
+        this.data.lastInputSeq = ip.seq;
+        continue;
+      }
       tickLivingMovement(this.level, e, this.server.hooks.travelOptions(this, this.travelOptions));
       if (inp.flying && e.physics.onGround && this.data.gameMode !== 'spectator') {
         inp.flying = false;

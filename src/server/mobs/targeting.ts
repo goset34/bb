@@ -62,6 +62,10 @@ export function canTarget(m: Mob, target: Entity, o: TargetOptions): boolean {
     if (!attackablePlayer(target)) return false;
     if (target.player && m.level.getDifficulty() === 0) return false;
     if (m.def.id === mobOf(target)?.def.id && !m.tmp['attacksOwnKind']) return false;
+    // Tamed mobs never turn on their owner
+    const owner = m.data['owner'];
+    if (owner && target.player?.name === owner) return false;
+    if (m.def.canAttack && !m.def.canAttack(m, target)) return false;
   }
   if (o.range > 0) {
     const v = o.testInvisible ? visibilityPercent(target, m) : 1;

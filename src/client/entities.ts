@@ -22,6 +22,25 @@ export const ENTITY_SIZES: Record<string, [number, number]> = {
   llama_spit: [0.25, 0.25],
 };
 
+/** Seat offsets per vehicle type (mirrors the server table): [forward, up] per seat. */
+const SEATS: Record<string, Array<[number, number]>> = {
+  pig: [[0, 0.62]], horse: [[0, 0.9]], donkey: [[0, 0.82]], mule: [[0, 0.9]], skeleton_horse: [[0, 0.9]], zombie_horse: [[0, 0.9]],
+  llama: [[-0.3, 1.12]], camel: [[0.5, 1.7], [-0.7, 1.7]], strider: [[0, 1.05]], chicken: [[0, 0.42]], spider: [[0, 0.52]],
+  boat: [[0.2, -0.1], [-0.6, -0.1]], minecart: [[0, 0]], ravager: [[0, 1.6]], polar_bear: [[0, 1.1]],
+};
+
+/** World position of the local rider's feet on a client vehicle. */
+export function riderSeat(v: ClientEntity, riderId = -1): [number, number, number] {
+  const seats = SEATS[v.type] ?? [[0, v.physics.height * 0.75]];
+  const list = (v.data['passengers'] as number[] | undefined) ?? [];
+  const idx = Math.max(0, riderId < 0 ? 0 : list.indexOf(riderId));
+  const [f, up] = seats[idx] ?? seats[0]!;
+  const t = v.transform;
+  const yaw = (t.bodyYaw * Math.PI) / 180;
+  const k = v.data['baby'] === true ? 0.5 : 1;
+  return [t.x - Math.sin(yaw) * f, t.y + up * k, t.z + Math.cos(yaw) * f];
+}
+
 /** Client-side flight of projectiles between server updates: [gravity, drag, water drag]. */
 const PROJECTILE_FLIGHT: Record<string, [number, number, number]> = {
   arrow: [0.05, 0.99, 0.6], spectral_arrow: [0.05, 0.99, 0.6], trident: [0.05, 0.99, 0.99], snowball: [0.03, 0.99, 0.8], egg: [0.03, 0.99, 0.8],
@@ -91,6 +110,24 @@ export class ClientEntities {
         i.tyaw = p['yaw'] as number; i.tpitch = p['pitch'] as number; i.theadYaw = p['headYaw'] as number;
         i.steps = e.type === 'item' || e.type === 'xp_orb' ? 1 : 3;
         e.physics.onGround = p['onGround'] as boolean;
+        return true;
+      }
+      case 'setPassengers': {
+        const id = p['id'] as number;
+        const ids = [...(p['passengers'] as Int32Array)];
+        const v = this.byId.get(id);
+        if (v) {
+          for (const old of (v.data['passengers'] as number[] | undefined) ?? []) {
+            const pe = this.byId.get(old);
+            if (pe && !ids.includes(old)) delete pe.data['vehicle'];
+          }
+          v.data['passengers'] = ids;
+        }
+        for (const pid of ids) {
+          const pe = this.byId.get(pid);
+          if (pe) pe.data['vehicle'] = id;
+        }
+        this.emit(v ?? null, id, 'passengers', ids.length);
         return true;
       }
       case 'entityVelocity': {
@@ -238,6 +275,14 @@ export class ClientEntities {
         move(this.level, e, p.vx, p.vy, p.vz);
         p.vx *= 0.98; p.vy *= 0.98; p.vz *= 0.98;
         if (p.onGround) { p.vx *= 0.7; p.vz *= 0.7; p.vy *= -0.5; }
+      }
+      // Riders sit on their vehicle's seat
+      const vid = e.data['vehicle'] as number | undefined;
+      const veh = vid !== undefined ? this.byId.get(vid) : undefined;
+      if (veh) {
+        const [sx, sy, sz] = riderSeat(veh, e.id);
+        t.x = sx; t.y = sy; t.z = sz;
+        i.steps = 0;
       }
       // Mobs receive their body rotation from the server; other living entities derive it
       if (MOBS.has(e.type) || PROJECTILE_FLIGHT[e.type]) t.bodyYaw = t.yaw;

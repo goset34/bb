@@ -219,6 +219,8 @@ export class EntityRenderer implements WorldLayer {
     v.data['useItem'] = this.player.hand.using && !getItem(this.player.hand.shown.id)?.food && getItem(this.player.hand.shown.id)?.useAnim !== 'drink' ? this.player.hand.useStack.id : '';
     v.data['useHand'] = this.player.hand.useOffhand ? 'off' : 'main';
     v.data['useTicks'] = this.player.hand.useTicks;
+    if (this.player.vehicle !== null) v.data['vehicle'] = this.player.vehicle;
+    else delete v.data['vehicle'];
     v.data['swimming'] = pe.input.swimming;
     v.data['sleeping'] = this.player.sleeping !== null;
     v.data['bedFacing'] = this.player.sleeping ?? 3;

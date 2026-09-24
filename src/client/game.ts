@@ -198,6 +198,11 @@ export class Game {
       ph.vx += p['kx'] as number; ph.vy += p['ky'] as number; ph.vz += p['kz'] as number;
       return;
     }
+    if (p.type === 'setPassengers') {
+      const ids = [...(p['passengers'] as Int32Array)];
+      if (ids.includes(this.entityId)) this.player.vehicle = p['id'] as number;
+      else if (this.player.vehicle === p['id']) this.player.vehicle = null;
+    }
     if (this.entities.handle(p)) return;
     if (this.fx.handle(p, this.entityRenderer.breaking)) return;
     switch (p.type) {
@@ -665,6 +670,12 @@ export class Game {
 
   openInventory(): void {
     if (this.screen || this.player.dead) return;
+    // Riding a mount with an inventory: the server opens the mount's menu instead
+    const v = this.player.vehicle !== null ? this.entities.get(this.player.vehicle) : undefined;
+    if (v && ['horse', 'donkey', 'mule', 'llama', 'camel', 'skeleton_horse', 'zombie_horse'].includes(v.type) && v.data['tamed'] === true) {
+      this.conn.send({ type: 'playerCommand', action: 'open_vehicle_inventory', data: 0 });
+      return;
+    }
     if (this.player.gameMode === 'creative') {
       this.showScreen(new CreativeScreen({
         icons: this.icons, menu: this.invMenu, player: this.menuPlayer, advancedTooltips: this.advancedTooltips,

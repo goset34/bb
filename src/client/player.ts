@@ -16,6 +16,7 @@ import { blockOf, stateFlags, F, getOutlineShape, isReplaceable, getCollisionSha
 import { blockForItem, getItem } from '../common/item/items';
 import { ItemStack } from '../common/item/stack';
 import type { ClientEntities, ClientEntity } from './entities';
+import { riderSeat } from './entities';
 import { BlockPlaceContext } from '../common/world/placecontext';
 import { DX, DY, DZ, Direction } from '../common/world/direction';
 import { destroyProgressPerTick } from '../common/item/mining';
@@ -76,6 +77,8 @@ export class LocalPlayer {
   /** Entity under the crosshair (closer than the block target). */
   targetEntity: ClientEntity | null = null;
   entities: ClientEntities | null = null;
+  /** Entity id of the vehicle being ridden (server authoritative), or null. */
+  vehicle: number | null = null;
   /** Ticks since the last attack (attack strength indicator). */
   attackTicker = 100;
   /** Third-person animation state (same shape as ClientInterp's animation fields). */
@@ -190,8 +193,15 @@ export class LocalPlayer {
     if (inp.flying) flags |= INPUT.FLYING;
     if (inp.fallFlying) flags |= INPUT.FALL_FLYING;
     if (inp.usingItem) flags |= INPUT.USING_ITEM;
-    // Predict
-    tickLivingMovement(this.level, e, this.travel);
+    // Predict (riders are carried by their vehicle: sit on its seat instead)
+    const v = this.vehicle !== null ? this.entities?.get(this.vehicle) : undefined;
+    if (v) {
+      const seat = riderSeat(v);
+      t.x = seat[0]; t.y = seat[1]; t.z = seat[2];
+      e.physics.vx = e.physics.vy = e.physics.vz = 0;
+      e.physics.onGround = false;
+      e.physics.fallDistance = 0;
+    } else tickLivingMovement(this.level, e, this.travel);
     if (inp.flying && e.physics.onGround && this.gameMode !== 'spectator') {
       inp.flying = false;
       a.flying = false;
@@ -345,6 +355,7 @@ export class LocalPlayer {
   // Reconciliation
   // ------------------------------------------------------------------------------------------
   onMoveAck(p: Packet): void {
+    if (this.vehicle !== null) return;
     const seq = p['seq'] as number;
     while (this.history.length && this.history[0]!.seq < seq) this.history.shift();
     const h = this.history[0];

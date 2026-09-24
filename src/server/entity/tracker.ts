@@ -14,7 +14,7 @@ const RANGES: Record<string, [number, number]> = {
   player: [512, 2], item: [96, 20], xp_orb: [96, 20], falling_block: [160, 20], tnt: [160, 10],
   arrow: [64, 20], spectral_arrow: [64, 20], trident: [64, 20], snowball: [64, 10], egg: [64, 10], void_pearl: [64, 10],
   experience_bottle: [64, 10], small_fireball: [64, 10], fireball: [64, 10], wind_charge: [64, 10], gust_charge: [64, 10], llama_spit: [64, 10],
-  lightning_bolt: [256, 20], boat: [160, 3], minecart: [128, 3], verge_dragon: [320, 3], blight: [320, 3],
+  lightning_bolt: [256, 20], leash_knot: [160, 100], boat: [160, 3], minecart: [128, 3], verge_dragon: [320, 3], blight: [320, 3],
 };
 
 /** Builds the type-specific spawn metadata. Other systems add fields via `metaProviders`. */
@@ -94,6 +94,8 @@ export class EntityTracker {
     });
     const eq = visibleEquipment(e);
     if (eq) p.send({ type: 'entityEquipment', id: e.id, slots: eq });
+    const passengers = e['passengers'] as Entity[] | undefined;
+    if (passengers?.length) p.send({ type: 'setPassengers', id: e.id, passengers: new Int32Array(passengers.map((x) => x.id)) });
     if (e.living && e.living.effects.size) {
       p.send({ type: 'entityEffects', id: e.id, effects: [...e.living.effects.values()].map((x) => ({ id: x.id, amp: x.amp, dur: x.dur, particles: x.particles, ambient: x.ambient })) });
     }

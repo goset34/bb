@@ -16,15 +16,21 @@ import { raycastBlocks } from '../../common/world/raycast';
 import { livingHooks } from '../survival/living';
 import { combatHooks } from '../survival/combat';
 import { ENTITY_CODECS, SavedEntity } from '../entity/persistence';
+import { ridingHooks, vehicleOf, passengersOf, stopRiding, startRiding, ejectPassengers } from '../entity/riding';
 import type { EffectInstance } from '../../common/entity/living';
-import { Mob, MOB_DEFS, mobOf, SpawnReason } from './mob';
+import { Mob, MOB_DEFS, mobOf, SpawnReason, RiderInput } from './mob';
 import { createMob, spawnMob, updateSize } from './factory';
 import { tickMob } from './tick';
 import { genericInteract, feedAnimal, useItem, handStack, setAge } from './actions';
+import { tickShoulders, releaseShoulders, saveShoulders, loadShoulders } from './defs/parrot';
+import { sleepingOf } from '../survival/sleep';
+import { recordPlayerAttack, petDeathMessage, ownerPlayer } from './tamable';
+import { leashInteract, knotInteract, dropLeash, leashToFence, leashSave, detachPlayerLeashes } from './leash';
 import { COMMAND_REGISTRARS, feedback } from '../commands/index';
 import { literal, argument, fail } from '../commands/dispatcher';
 import { vec3, greedy, registryId, CommandSource } from '../commands/args';
 import './defs/index';
+import { openMountInventory } from './defs/horses';
 
 // ---------------------------------------------------------------------------------------------
 // Death
@@ -91,6 +97,14 @@ interface SavedMob {
 
 function saveMob(e: Entity): Record<string, unknown> {
   const m = mobOf(e)!;
+  const v = vehicleOf(e);
+  const vm = mobOf(v);
+  if (vm) {
+    vm.data['uuid'] ??= newUuid(m);
+    m.data['ride'] = vm.data['uuid'];
+  } else delete m.data['ride'];
+  const leash = leashSave(m);
+  if (leash) m.data['leash'] = leash;
   const s: SavedMob = {
     data: m.data,
     health: e.living!.health,
@@ -129,6 +143,11 @@ function loadMob(level: ServerLevel, saved: SavedEntity): Entity | null {
   updateSize(m);
   m.def.syncMeta?.(m);
   return e;
+}
+
+function newUuid(m: Mob): string {
+  const r = m.random;
+  return [r.nextInt(0x7fffffff), r.nextInt(0x7fffffff), m.level.getGameTime()].map((n) => n.toString(36)).join('-');
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -274,6 +293,11 @@ function install(server: StrataServer): void {
   const prevHurt = livingHooks.onHurt;
   livingHooks.onHurt = (level, e, type, amount, attacker) => {
     prevHurt(level, e, type, amount, attacker);
+    if (attacker && attacker !== e) recordPlayerAttack(level, attacker, e);
+    if (e.player) {
+      const sp = level.players.find((pl) => pl.entity === e);
+      if (sp) releaseShoulders(sp);
+    }
     const m = mobOf(e);
     if (!m) return;
     m.noActionTime = 0;
@@ -293,19 +317,27 @@ function install(server: StrataServer): void {
   const prevDeath = livingHooks.onDeath;
   livingHooks.onDeath = (level, e, type, attacker) => {
     prevDeath(level, e, type, attacker);
+    if (e.player) {
+      const sp = level.players.find((pl) => pl.entity === e);
+      if (sp) releaseShoulders(sp, true);
+    }
     const killer = mobOf(attacker);
     if (killer && attacker !== e) killer.def.onKill?.(killer, e);
+    if (vehicleOf(e)) stopRiding(level, e);
+    if (passengersOf(e).length) ejectPassengers(level, e);
     const m = mobOf(e);
     if (!m) return;
+    dropLeash(m, true);
     if (m.def.deathSound) m.playSound(m.def.deathSound);
     m.goals.stopAll();
     m.targets.stopAll();
     m.nav.stop();
     dropLoot(m, attacker);
     m.def.onDeath?.(m, type, attacker);
-    if (e['customName'] && level.getGameRule('showDeathMessages') !== false) {
-      for (const p of level.players) p.send({ type: 'chat', kind: 'system', text: { key: 'death.named', args: [String(e['customName'])] } });
-    }
+    // Tamed pets report their death to the owner (named or not); other named mobs only log it
+    const petMsg = petDeathMessage(m, type, attacker);
+    if (petMsg && level.getGameRule('showDeathMessages') !== false) ownerPlayer(m)?.send({ type: 'chat', kind: 'system', text: petMsg });
+    else if (e['customName']) console.info(`Named entity ${String(e['customName'])} died: ${type}`);
   };
 
   const prevInteract = combatHooks.interact;
@@ -322,17 +354,89 @@ function install(server: StrataServer): void {
           return true;
         }
       }
+      if (leashInteract(m, p, hand)) return true;
       if (genericInteract(m, p, hand)) return true;
       if (m.def.interact?.(m, p, hand)) return true;
       if (feedAnimal(m, p, hand)) return true;
     }
+    if (hand === 'main' && knotInteract(p, target)) return true;
     return prevInteract(p, target, hand);
   };
 
   const prevUseOn = h.useItemOn;
-  h.useItemOn = (p, hand, stack, x, y, z, face, hx, hy, hz) => prevUseOn(p, hand, stack, x, y, z, face, hx, hy, hz) || useEggOnBlock(p, hand, stack, x, y, z, face);
+  h.useItemOn = (p, hand, stack, x, y, z, face, hx, hy, hz) => prevUseOn(p, hand, stack, x, y, z, face, hx, hy, hz) || useEggOnBlock(p, hand, stack, x, y, z, face)
+    || (hand === 'main' && !p.entity.input.sneaking && leashToFence(p, x, y, z));
   const prevUse = h.useItem;
   h.useItem = (p, hand) => prevUse(p, hand) || useEggInAir(p, hand);
+
+  // ---- Riding
+  ridingHooks.canBeControlledBy = (vehicle, rider) => {
+    const m = mobOf(vehicle);
+    return !!m && !!rider.player && !!m.def.controlledBy?.(m, rider);
+  };
+  const prevRider = h.riderInput;
+  h.riderInput = (p) => {
+    if (prevRider(p)) return true;
+    const e = p.entity;
+    const v = vehicleOf(e);
+    if (!v) return false;
+    if (e.input.sneaking) {
+      stopRiding(p.level, e);
+      return true;
+    }
+    const vm = mobOf(v);
+    const t = e.transform;
+    if (vm) vm.tmp['riderInput'] = { forward: e.input.forward, strafe: e.input.strafe, jumping: e.input.jumping, sprinting: e.input.sprinting, yaw: t.yaw, pitch: t.pitch } satisfies RiderInput;
+    e.physics.fallDistance = 0;
+    return true;
+  };
+  const prevPacket = h.packet;
+  h.packet = (p, packet) => {
+    if (packet.type === 'playerCommand' && packet['action'] === 'open_vehicle_inventory') {
+      const vm = mobOf(vehicleOf(p.entity));
+      if (vm && vm.data['tamed']) openMountInventory(vm, p);
+      return;
+    }
+    prevPacket(p, packet);
+  };
+  // Shoulder parrots travel with the player's save
+  const prevPTick = h.playerTick;
+  h.playerTick = (p) => {
+    prevPTick(p);
+    tickShoulders(p, !!sleepingOf(p));
+  };
+  const prevSaveP = h.savePlayer;
+  h.savePlayer = (p) => {
+    const sh = saveShoulders(p);
+    return sh ? { ...prevSaveP(p), shoulders: sh } : prevSaveP(p);
+  };
+  const prevLoadP = h.loadPlayer;
+  h.loadPlayer = (p, d) => {
+    prevLoadP(p, d);
+    loadShoulders(p, d['shoulders']);
+  };
+  const prevLeft = h.playerLeft;
+  h.playerLeft = (p) => {
+    if (vehicleOf(p.entity)) stopRiding(p.level, p.entity);
+    detachPlayerLeashes(p);
+    prevLeft(p);
+  };
+  // Re-attach saved riders to their vehicles when chunks load
+  const prevLoaded = h.chunkLoaded;
+  h.chunkLoaded = (level, c) => {
+    prevLoaded(level, c);
+    for (const e of level.entities.all()) {
+      const m = mobOf(e);
+      const want = m?.data['ride'] as string | undefined;
+      if (!m || !want || vehicleOf(e)) continue;
+      for (const v of level.entities.all()) {
+        if (mobOf(v)?.data['uuid'] === want) {
+          startRiding(level, e, v);
+          break;
+        }
+      }
+    }
+  };
 
   const prevEffects = livingHooks.onEffectsChanged;
   livingHooks.onEffectsChanged = (level, e) => {

@@ -113,6 +113,8 @@ export interface ServerHooks {
   canFallFly(p: ServerPlayer): boolean;
   speedMultiplier(p: ServerPlayer): number;
   travelOptions(p: ServerPlayer, base: TravelOptions): TravelOptions;
+  /** A riding player's input for this tick (true = the player does not move by itself). */
+  riderInput(p: ServerPlayer): boolean;
   afterMove(p: ServerPlayer): void;
   miningModifiers(p: ServerPlayer): MiningModifiers;
   canAdventureBreak(p: ServerPlayer, x: number, y: number, z: number): boolean;
@@ -173,6 +175,7 @@ function defaultHooks(server: StrataServer): ServerHooks {
     canFallFly: () => false,
     speedMultiplier: () => 1,
     travelOptions: (_p, base) => base,
+    riderInput: () => false,
     afterMove() {},
     miningModifiers: () => NO_MODIFIERS,
     canAdventureBreak: () => false,

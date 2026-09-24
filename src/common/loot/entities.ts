@@ -95,3 +95,10 @@ simple('slime', pool([entry('slime_ball', count(0, 2), loot())], 1, when(flag('s
 simple('phantom', pool([entry('phantom_membrane', count(0, 1), loot())], 1, when(killedByPlayer)));
 simple('gustling', pool([entry('gust_rod', count(1, 2), loot())], 1, when(killedByPlayer)));
 simple('echo_warden', pool([entry('echo_catalyst')]));
+
+// ---- Gameplay tables -------------------------------------------------------------------------
+/** What a tamed cat brings its owner at dawn. */
+registerLootTable('gameplay/cat_morning_gift', table(pool([
+  entry('rabbit_hide', w(10)), entry('rabbit_foot', w(10)), entry('chicken', w(10)), entry('feather', w(10)),
+  entry('rotten_flesh', w(10)), entry('string', w(10)), entry('phantom_membrane', w(2)),
+])));

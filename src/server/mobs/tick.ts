@@ -7,10 +7,14 @@ import { stateFlags, F, getCollisionShape, blockOf } from '../../common/block/re
 import { tickLivingMovement, updateFluidState, moveRelative, move, DEFAULT_TRAVEL, TravelOptions } from '../../common/entity/physics';
 import { MOBS } from '../../common/entity/mobs';
 import { hurt, tickLiving, hasEffect, effectAmp } from '../survival/living';
-import type { Mob } from './mob';
+import type { Mob, RiderInput } from './mob';
+import { Flag } from './goals';
+import { controllingPassenger, vehicleOf, passengersOf, positionPassengers } from '../entity/riding';
 import { getItem } from '../../common/item/items';
 import { ItemStack } from '../../common/item/stack';
 import { tickAgeing } from './actions';
+import { tickLeash } from './leash';
+import { tickPickup } from './pickup';
 
 /** Despawn distances per category: [instant despawn, random despawn]. */
 const DESPAWN: Record<string, [number, number] | null> = {
@@ -186,10 +190,11 @@ function checkDespawn(m: Mob): boolean {
 }
 
 function ambientSound(m: Mob): void {
-  if (!m.def.ambient) return;
+  if (!m.def.ambient && !m.def.ambientFor) return;
   if (m.random.nextInt(1000) < m.ambientSoundTime++) {
     m.ambientSoundTime = -(m.tmp['ambientInterval'] as number | undefined ?? 80);
-    m.playSound(m.def.ambient);
+    const s = m.def.ambientFor ? m.def.ambientFor(m) : m.def.ambient;
+    if (s) m.playSound(s);
   }
 }
 
@@ -212,6 +217,14 @@ export function tickMob(m: Mob): void {
   tickEnvironment(m);
   if (e.removed || l.dead) return;
   ambientSound(m);
+  // A controlling rider steers the mob; its own movement goals pause
+  const rider = controllingPassenger(e);
+  const riderInput = rider ? (m.tmp['riderInput'] as RiderInput | undefined) : undefined;
+  m.goals.setControlFlag(Flag.MOVE, !rider);
+  m.goals.setControlFlag(Flag.JUMP, !rider && !vehicleOf(e));
+  m.goals.setControlFlag(Flag.LOOK, !rider);
+  tickLeash(m);
+  if (e.removed || l.dead) return;
   if (!m.noAi) {
     m.noActionTime++;
     m.sensing.tick();
@@ -225,17 +238,27 @@ export function tickMob(m: Mob): void {
     m.nav.tick();
     m.def.tick?.(m);
     if (e.removed) return;
-    m.move.tick();
-    m.look.tick();
-    m.jump.tick();
+    if (rider && riderInput && m.def.ridden) {
+      m.nav.stop();
+      m.def.ridden(m, rider, riderInput);
+    } else {
+      m.move.tick();
+      m.look.tick();
+      m.jump.tick();
+    }
   } else {
     e.input.forward = e.input.strafe = e.input.up = 0;
     e.input.jumping = false;
     m.def.tick?.(m);
   }
   tickAgeing(m);
-  travel(m);
-  pushEntities(m);
+  if (!m.noAi) tickPickup(m);
+  // Passengers are carried by their vehicle
+  if (!vehicleOf(e)) {
+    travel(m);
+    pushEntities(m);
+  }
   m.body.tick();
+  if (passengersOf(e).length) positionPassengers(e);
   checkDespawn(m);
 }

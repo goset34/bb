@@ -7,6 +7,7 @@ import { registerRecipes } from './recipe/data';
 import { registerChestLoot } from './loot/chests';
 import './loot/blocks';
 import './loot/entities';
+import './menu/horse';
 import { attachBehaviors } from './block/behaviors/index';
 import { registerGrowthBehaviors, wrapGrowthBehaviors } from './block/behaviors/growth';
 import { registerStationBehaviors, wrapStationBehaviors } from './block/behaviors/stations';

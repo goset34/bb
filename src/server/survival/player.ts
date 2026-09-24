@@ -297,15 +297,21 @@ export function finishUsing(level: ServerLevel, p: ServerPlayer, hand: 'main' | 
 // Death and respawn
 // ---------------------------------------------------------------------------------------------
 
-function deathMessage(p: ServerPlayer, type: string, attacker: Entity | null): TextComponent {
-  const who: TextComponent | null = attacker?.player ? { text: attacker.player.name } : attacker ? { key: `entity.${attacker.type}` } : null;
+/** Death message for any victim name ("X was slain by Y"), shared by players and pets. */
+export function deathMessageFor(victim: TextComponent, type: string, attacker: Entity | null, fallDistance: number): TextComponent {
+  const custom = attacker?.['customName'] as string | undefined;
+  const who: TextComponent | null = attacker?.player ? { text: attacker.player.name } : custom ? { text: custom } : attacker ? { key: `entity.${attacker.type}` } : null;
   let base = `death.${type}`;
-  if (type === 'fall' && p.entity.physics.fallDistance > 5) base = 'death.fall.high';
+  if (type === 'fall' && fallDistance > 5) base = 'death.fall.high';
   let key = who && has(`${base}.by`, 'en') ? `${base}.by` : base;
   if (!has(key, 'en')) key = who ? 'death.generic.by' : 'death.generic';
-  const args: TextComponent[] = [{ text: p.name }];
+  const args: TextComponent[] = [victim];
   if (who && key.endsWith('.by')) args.push(who);
   return { key, args };
+}
+
+function deathMessage(p: ServerPlayer, type: string, attacker: Entity | null): TextComponent {
+  return deathMessageFor({ text: p.name }, type, attacker, p.entity.physics.fallDistance);
 }
 
 export function onPlayerDeath(server: StrataServer, level: ServerLevel, p: ServerPlayer, type: string, attacker: Entity | null): void {

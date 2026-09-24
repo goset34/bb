@@ -56,6 +56,8 @@ export const livingHooks = {
   },
   /** Adjust incoming damage before it is applied (mob immunities, weaknesses); 0 cancels. */
   adjustDamage: (_level: ServerLevel, _e: Entity, _type: string, amount: number, _attacker: Entity | null): number => amount,
+  /** Body armour that takes a whole hit instead of the wearer (wolf armour); true = absorbed. */
+  absorbHit: (_level: ServerLevel, _e: Entity, _type: string, _amount: number): boolean => false,
   /** Damage an item held/worn by the entity (players lose the item when it breaks). */
   damageItem: (_level: ServerLevel, _e: Entity, _stack: ItemStack, _amount: number): void => {},
 };
@@ -151,6 +153,7 @@ export function hurt(level: ServerLevel, e: Entity, type: string, amount: number
     l.invulnerable = 20;
     l.hurtTime = 10;
   }
+  if (livingHooks.absorbHit(level, e, type, applied)) applied = 0;
   // Armor
   if (!info.bypassArmor) {
     const armor = l.attrs.value('armor');

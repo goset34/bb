@@ -82,6 +82,8 @@ export interface MobDef {
   food?: (stack: ItemStack) => boolean;
   /** Ambient sound id and interval. */
   ambient?: string;
+  /** State-dependent ambient sound (growling when angry, purring when tamed…); null = silent. */
+  ambientFor?(m: Mob): string | null;
   hurtSound?: string;
   deathSound?: string;
   stepSound?: string;
@@ -115,6 +117,10 @@ export interface MobDef {
   walkTargetValue?(m: Mob, x: number, y: number, z: number): number;
   /** Offspring when two mobs breed (default: same type). */
   offspring?(m: Mob, partner: Mob): { type: string; data?: MobData } | null;
+  /** A rider steers this mob (saddled horses, pigs with a carrot on a stick). */
+  controlledBy?(m: Mob, rider: Entity): boolean;
+  /** Turn rider input into this mob's movement (yaw, forward speed, jumps). */
+  ridden?(m: Mob, rider: Entity, input: RiderInput): void;
   /** This mob killed another entity (charged hisser heads, wither roses…). */
   onKill?(m: Mob, victim: Entity): void;
   /** Struck by lightning; return true to replace the default damage and ignition. */
@@ -125,6 +131,24 @@ export interface MobDef {
   syncMeta?(m: Mob): void;
   /** Can this mob mate with another (default: same type, both in love). */
   canMate?(m: Mob, other: Mob): boolean;
+  /** Items this mob picks up (default: better weapons and armour). */
+  wantsToPickUp?(m: Mob, stack: ItemStack): boolean;
+  /** Custom pickup (foxes carry items in their mouth, allays collect copies…). */
+  pickUp?(m: Mob, item: Entity): void;
+  /** Items this mob may hold at all. */
+  canHoldItem?(m: Mob, stack: ItemStack): boolean;
+  /** Extra hostile targeting rule (pets sparing their owner's other pets…). */
+  canAttack?(m: Mob, target: Entity): boolean;
+}
+
+/** Input of a player controlling a vehicle this tick. */
+export interface RiderInput {
+  forward: number;
+  strafe: number;
+  jumping: boolean;
+  sprinting: boolean;
+  yaw: number;
+  pitch: number;
 }
 
 export const MOB_DEFS = new Map<string, MobDef>();

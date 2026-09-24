@@ -12,6 +12,7 @@ import { FurnaceMenu, FURNACE_KINDS, FurnaceState, newFurnaceState, tickFurnace,
 import { blockOf, getValue, setValue, tryGetValue, stateFlags, F } from '../../common/block/registry';
 import { P } from '../../common/block/properties';
 import { DX, DZ, Direction, rotateCW, rotateCCW } from '../../common/world/direction';
+import { AABB } from '../../common/math/geom';
 import type { ServerLevel } from '../level';
 import type { ServerPlayer } from '../player';
 import { SERVER_MENUS, blockMenuValid } from '../menus';
@@ -71,6 +72,17 @@ function setViewers(level: ServerLevel, x: number, y: number, z: number, delta: 
   }
 }
 
+/** Players currently looking into the container at a position. */
+export function containerViewers(level: ServerLevel, x: number, y: number, z: number): number {
+  return viewers.get(`${level.dimId}:${x},${y},${z}`) ?? 0;
+}
+
+/** A cat sitting on a chest keeps it shut (reference ChestBlock.isCatSittingOnChest). */
+function catSittingOn(level: ServerLevel, x: number, y: number, z: number): boolean {
+  const box = new AABB(x, y + 1, z, x + 1, y + 2, z + 1);
+  return level.getEntities(box, (e) => e.type === 'cat' && e.meta?.['sitting'] === true).length > 0;
+}
+
 /** Menu that tracks viewer counts for the block(s) it shows. */
 class BlockViewMenu extends GenericMenu {
   private closed = false;
@@ -128,7 +140,7 @@ SERVER_MENUS.set('chest', (p, id, o) => {
   const state = level.getBlockState(o.x, o.y, o.z);
   const b = blockOf(state);
   // A full solid block above the chest prevents opening (reference)
-  if (isSolidTop(level.getBlockState(o.x, o.y + 1, o.z))) return null;
+  if (isSolidTop(level.getBlockState(o.x, o.y + 1, o.z)) || catSittingOn(level, o.x, o.y, o.z)) return null;
   const type = tryGetValue(state, P.chestType) ?? 'single';
   const be = ensureBE(level, o.x, o.y, o.z, 'chest');
   const self = beContainer(level, be, 27);
@@ -139,7 +151,7 @@ SERVER_MENUS.set('chest', (p, id, o) => {
     const ox = o.x + DX[d]!, oz = o.z + DZ[d]!;
     const other = level.getBlockState(ox, o.y, oz);
     if (blockOf(other) === b && tryGetValue(other, P.chestType) !== 'single') {
-      if (isSolidTop(level.getBlockState(ox, o.y + 1, oz))) return null;
+      if (isSolidTop(level.getBlockState(ox, o.y + 1, oz)) || catSittingOn(level, ox, o.y, oz)) return null;
       const obe = ensureBE(level, ox, o.y, oz, 'chest');
       const oc = beContainer(level, obe, 27);
       const [first, second] = type === 'left' ? [self, oc] : [oc, self];
