@@ -44,7 +44,8 @@ export interface ItemData {
   charged?: SerializedStack[];
   instrument?: string;
   suspicious?: Array<{ id: string; dur: number }>;
-  bees?: number;
+  /** Bees stored in a hive item (saved occupants). */
+  bees?: Array<Record<string, unknown>>;
   honey?: number;
   sherds?: string[];
   ominous?: number;

@@ -326,7 +326,7 @@ export function registerPlants(): void {
     hardness: 0.5, sound: 'metal', map: 'color_red', randomTicks: true, push: 'destroy', occludes: false,
     model: (s) => model([box([1, 0, 2], [15, 16, 14], ['sniffer_egg', 'sniffer_egg_slightly_cracked', 'sniffer_egg_very_cracked'][s.get(P.eggsSniffer)]!, { cullEdges: false })]),
   });
-  reg('frogspawn', [], { hardness: 0, collision: false, sound: 'frogspawn', map: 'water', layer: 'cutout', push: 'destroy', occludes: false, randomTicks: true, model: () => model([{ from: [0, 1.5, 0], to: [16, 1.5, 16], shade: false, faces: { 1: { tex: 'frogspawn' }, 0: { tex: 'frogspawn' } } }], false) });
+  reg('frogspawn', [], { hardness: 0, collision: false, sound: 'frogspawn', map: 'water', layer: 'cutout', push: 'destroy', occludes: false, model: () => model([{ from: [0, 1.5, 0], to: [16, 1.5, 16], shade: false, faces: { 1: { tex: 'frogspawn' }, 0: { tex: 'frogspawn' } } }], false) });
 
   // Nether flora
   cross('crimson_fungus', { map: 'nether', sound: 'fungus', offset: 'none', tags: ['saplings'] });

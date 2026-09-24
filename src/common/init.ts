@@ -11,6 +11,7 @@ import './menu/horse';
 import { attachBehaviors } from './block/behaviors/index';
 import { registerGrowthBehaviors, wrapGrowthBehaviors } from './block/behaviors/growth';
 import { registerStationBehaviors, wrapStationBehaviors } from './block/behaviors/stations';
+import { registerEggBehaviors } from './block/behaviors/eggs';
 import { registerEffects } from './effect/effects';
 import { hashString } from './math/random';
 
@@ -25,6 +26,7 @@ export function initRegistries(pre?: StateTables): void {
   assignBlockItemProperties((name) => getBlock(name).settings.tags ?? []);
   registerGrowthBehaviors();
   registerStationBehaviors();
+  registerEggBehaviors();
   attachBehaviors();
   wrapGrowthBehaviors();
   wrapStationBehaviors();

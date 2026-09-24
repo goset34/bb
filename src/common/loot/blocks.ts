@@ -9,7 +9,7 @@ import { ITEMS } from '../item/items';
 import { Random } from '../math/random';
 import { ItemStack } from '../item/stack';
 import {
-  LootTable, LootEntry, Condition, LootContext, table, pool, entry, alternatives, group, empty, when, apply, hasSilk, hasShears, silkOrShears,
+  LootTable, LootEntry, Condition, LootContext, table, pool, entry, alternatives, group, empty, when, apply, hasSilk, noSilk, hasShears, silkOrShears,
   survivesExplosion, setCount, setCountF, oreBonus, uniformBonus, binomialBonus, limit, explosionDecay, fortuneChance, chance, registerLootResolver,
 } from './loot';
 
@@ -98,7 +98,9 @@ function build(b: Block): LootTable | null {
       if (/^(glass|tinted_glass|.*_stained_glass(_pane)?|glass_pane|ice|packed_ice|blue_ice)$/.test(n)) return n === 'tinted_glass' ? dropsSelf(b) : onlySilk(n);
       if (n === 'farmland' || n === 'dirt_path') return table(pool([entry('dirt')], 1, when(survivesExplosion)));
       if (/^echo_/.test(n)) return onlySilk(n);
-      if (n === 'bee_nest' || n === 'beehive') return n === 'beehive' ? dropsSelf(b) : onlySilk(n);
+      // Silk touch hives are dropped by the hive block entity (keeping their bees)
+      if (n === 'beehive') return table(pool([entry(n)], 1, when(survivesExplosion), when(noSilk)));
+      if (n === 'bee_nest') return null;
       return null;
     }
     return null;

@@ -6,7 +6,9 @@ import { ItemStack } from '../../../common/item/stack';
 import { BIOMES } from '../../../common/worldgen/biomes';
 import { blockOf } from '../../../common/block/registry';
 import { damagePlayerSlot } from '../../survival/interaction';
-import { registerMob, Mob, MobDef } from '../mob';
+import { registerMob, Mob, MobDef, mobOf } from '../mob';
+import { holdsSteeringItem, rideSteered } from '../steering';
+import { startRiding, passengersOf } from '../../entity/riding';
 import { spawnMob } from '../factory';
 import { handStack, exchangeItem, useItem } from '../actions';
 import { EatBlockGoal } from '../goallib';
@@ -54,10 +56,35 @@ registerMob({
       useItem(p, hand, s);
       return true;
     }
+    // Climb onto a saddled pig (food still breeds it)
+    if (m.data['saddle'] && !m.isBaby && !passengersOf(m.e).length && !p.entity.input.sneaking && !m.def.food?.(s)) {
+      return startRiding(m.level, p.entity, m.e);
+    }
     return false;
   },
   onDeath(m) {
     if (m.data['saddle']) m.level.spawnItem(m.x, m.y + 0.5, m.z, new ItemStack('saddle', 1));
+  },
+  steeringItem: 'carrot_on_a_stick',
+  controlledBy(m, rider) {
+    return !!m.data['saddle'] && holdsSteeringItem(rider, 'carrot_on_a_stick');
+  },
+  ridden(m, _rider, input) {
+    rideSteered(m, input, 0.225);
+  },
+  onLightning(m) {
+    // Lightning turns pigs into zombie swinekin
+    if (m.level.getDifficulty() === 0) return false;
+    const z = m.level.createEntity('zombie_swinekin', m.x, m.y, m.z, { reason: 'conversion', yaw: m.e.transform.yaw });
+    if (!z) return false;
+    const zm = mobOf(z);
+    if (zm) {
+      zm.equipment[0] = new ItemStack('golden_sword', 1);
+      zm.setPersistent();
+      if (m.e['customName']) z['customName'] = m.e['customName'];
+    }
+    m.level.entities.remove(m.e);
+    return true;
   },
 });
 

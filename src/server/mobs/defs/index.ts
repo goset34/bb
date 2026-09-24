@@ -6,3 +6,7 @@ import './horses';
 import './pets';
 import './parrot';
 import './fox';
+import './animals';
+import './panda';
+import './bees';
+import './frogs';

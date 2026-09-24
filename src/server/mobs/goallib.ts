@@ -775,3 +775,82 @@ export class AngerTargetGoal extends NearestAttackableTargetGoal {
     super(m, 'player', 10, true, false, (e) => isAngryAt(m, e));
   }
 }
+
+/** Walk to a block matching a predicate (reference MoveToBlockGoal with its spiral search). */
+export abstract class MoveToBlockGoal extends Goal {
+  protected nextStartTick = 0;
+  protected tryTicks = 0;
+  private maxStayTicks = 0;
+  blockPos: Vec3 = [0, 0, 0];
+  reachedTarget = false;
+  protected verticalSearchStart = 0;
+  constructor(protected readonly m: Mob, protected readonly speed: number, protected readonly searchRange: number, protected readonly verticalRange = 1) {
+    super();
+    this.flags = Flag.MOVE | Flag.JUMP;
+  }
+  protected abstract isValidTarget(x: number, y: number, z: number): boolean;
+  protected nextStart(): number {
+    return reducedTickDelay(200 + this.m.random.nextInt(200));
+  }
+  canUse(): boolean {
+    if (this.nextStartTick > 0) {
+      this.nextStartTick--;
+      return false;
+    }
+    this.nextStartTick = this.nextStart();
+    return this.findNearestBlock();
+  }
+  override canContinueToUse(): boolean {
+    return this.tryTicks >= -this.maxStayTicks && this.tryTicks <= 1200 && this.isValidTarget(...this.blockPos);
+  }
+  override start(): void {
+    this.moveMobToBlock();
+    this.tryTicks = 0;
+    this.maxStayTicks = this.m.random.nextInt(this.m.random.nextInt(1200) + 1200) + 1200;
+  }
+  protected moveMobToBlock(): void {
+    const [x, y, z] = this.moveTarget();
+    this.m.nav.moveTo(x + 0.5, y, z + 0.5, this.speed);
+  }
+  protected acceptedDistance(): number {
+    return 1;
+  }
+  /** Where the mob stands (default: on top of the block). */
+  protected moveTarget(): Vec3 {
+    return [this.blockPos[0], this.blockPos[1] + 1, this.blockPos[2]];
+  }
+  override requiresUpdateEveryTick(): boolean {
+    return true;
+  }
+  override tick(): void {
+    const [x, y, z] = this.moveTarget();
+    const d = (this.m.x - x - 0.5) ** 2 + (this.m.y - y - 0.5) ** 2 + (this.m.z - z - 0.5) ** 2;
+    const a = this.acceptedDistance();
+    if (d > a * a) {
+      this.reachedTarget = false;
+      this.tryTicks++;
+      if (this.tryTicks % 40 === 0) this.m.nav.moveTo(x + 0.5, y, z + 0.5, this.speed);
+    } else {
+      this.reachedTarget = true;
+      this.tryTicks--;
+    }
+  }
+  protected findNearestBlock(): boolean {
+    const bx = Math.floor(this.m.x), by = Math.floor(this.m.y), bz = Math.floor(this.m.z);
+    const r = this.searchRange, v = this.verticalRange;
+    for (let k = this.verticalSearchStart; k <= v; k = k > 0 ? -k : 1 - k) {
+      for (let l = 0; l < r; l++) {
+        for (let i = 0; i <= l; i = i > 0 ? -i : 1 - i) {
+          for (let j = i < l && i > -l ? l : 0; j <= l; j = j > 0 ? -j : 1 - j) {
+            const x = bx + i, y = by + k - 1, z = bz + j;
+            if (this.m.isWithinRestriction(x, y, z) && this.isValidTarget(x, y, z)) {
+              this.blockPos = [x, y, z];
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+}

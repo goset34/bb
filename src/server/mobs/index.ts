@@ -24,6 +24,8 @@ import { tickMob } from './tick';
 import { genericInteract, feedAnimal, useItem, handStack, setAge } from './actions';
 import { tickShoulders, releaseShoulders, saveShoulders, loadShoulders } from './defs/parrot';
 import { sleepingOf } from '../survival/sleep';
+import { useSteeringItem } from './steering';
+import { harvestHive, hiveBroken, hivePlaced, hiveSystem } from './defs/bees';
 import { recordPlayerAttack, petDeathMessage, ownerPlayer } from './tamable';
 import { leashInteract, knotInteract, dropLeash, leashToFence, leashSave, detachPlayerLeashes } from './leash';
 import { COMMAND_REGISTRARS, feedback } from '../commands/index';
@@ -365,9 +367,20 @@ function install(server: StrataServer): void {
 
   const prevUseOn = h.useItemOn;
   h.useItemOn = (p, hand, stack, x, y, z, face, hx, hy, hz) => prevUseOn(p, hand, stack, x, y, z, face, hx, hy, hz) || useEggOnBlock(p, hand, stack, x, y, z, face)
-    || (hand === 'main' && !p.entity.input.sneaking && leashToFence(p, x, y, z));
+    || (hand === 'main' && !p.entity.input.sneaking && leashToFence(p, x, y, z)) || harvestHive(p, hand, x, y, z);
+  const prevBERemoved = h.blockEntityRemoved;
+  h.blockEntityRemoved = (level, be, oldState, suppress) => {
+    prevBERemoved(level, be, oldState, suppress);
+    if (be.type === 'beehive') hiveBroken(level, be, oldState, level.breaker);
+  };
+  const prevPlaced = h.blockPlaced;
+  h.blockPlaced = (p, x, y, z, state, stack, hand) => {
+    prevPlaced(p, x, y, z, state, stack, hand);
+    if (stack.data.bees || stack.data.honey) hivePlaced(p.level, x, y, z, stack);
+  };
+  for (const level of server.levels.values()) level.systems.push(hiveSystem(level));
   const prevUse = h.useItem;
-  h.useItem = (p, hand) => prevUse(p, hand) || useEggInAir(p, hand);
+  h.useItem = (p, hand) => prevUse(p, hand) || useEggInAir(p, hand) || useSteeringItem(p, hand);
 
   // ---- Riding
   ridingHooks.canBeControlledBy = (vehicle, rider) => {

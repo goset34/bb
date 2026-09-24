@@ -119,6 +119,8 @@ export interface MobDef {
   offspring?(m: Mob, partner: Mob): { type: string; data?: MobData } | null;
   /** A rider steers this mob (saddled horses, pigs with a carrot on a stick). */
   controlledBy?(m: Mob, rider: Entity): boolean;
+  /** Item a rider holds to steer this mob (carrot on a stick…). */
+  steeringItem?: string;
   /** Turn rider input into this mob's movement (yaw, forward speed, jumps). */
   ridden?(m: Mob, rider: Entity, input: RiderInput): void;
   /** This mob killed another entity (charged hisser heads, wither roses…). */
