@@ -116,7 +116,7 @@ export class TerrainFiller {
   floating = false;
   seaLevel = SEA_LEVEL;
 
-  constructor(private readonly noises: TerrainNoises, private readonly climate: Climate, readonly blocks: TerrainBlocks, minY: number, height: number) {
+  constructor(private readonly noises: TerrainNoises, readonly climate: Climate, readonly blocks: TerrainBlocks, minY: number, height: number) {
     this.minY = minY;
     this.height = height;
     this.ny = height / CELL_H + 1;

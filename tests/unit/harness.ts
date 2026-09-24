@@ -17,27 +17,24 @@ import type { GeneratorSettings } from '../../src/common/worldgen/generator';
 
 let initialized = false;
 
+/** In-memory transport; messages are delivered to the peer on a microtask. */
+class MemoryTransport implements RawTransport {
+  peer: MemoryTransport | null = null;
+  private msgCb: (d: Uint8Array) => void = () => {};
+  private closeCb: (r: string) => void = () => {};
+  send(data: Uint8Array): void {
+    const copy = data.slice();
+    queueMicrotask(() => this.peer?.msgCb(copy));
+  }
+  onMessage(cb: (d: Uint8Array) => void): void { this.msgCb = cb; }
+  onClose(cb: (r: string) => void): void { this.closeCb = cb; }
+  close(): void { queueMicrotask(() => this.peer?.closeCb('closed')); }
+}
+
 function memoryPair(): [RawTransport, RawTransport] {
-  const make = (): RawTransport & { peer?: RawTransport & { deliver(d: Uint8Array): void }; deliver(d: Uint8Array): void; closeCb(r: string): void } => {
-    let msgCb: (d: Uint8Array) => void = () => {};
-    let closeCb: (r: string) => void = () => {};
-    const t = {
-      peer: undefined as never,
-      send(data: Uint8Array) {
-        const copy = data.slice();
-        queueMicrotask(() => t.peer?.deliver(copy));
-      },
-      deliver(d: Uint8Array) { msgCb(d); },
-      onMessage(cb: (d: Uint8Array) => void) { msgCb = cb; },
-      onClose(cb: (r: string) => void) { closeCb = cb; },
-      closeCb(r: string) { closeCb(r); },
-      close() { queueMicrotask(() => (t.peer as unknown as { closeCb(r: string): void } | undefined)?.closeCb('closed')); },
-    };
-    return t;
-  };
-  const a = make(), b = make();
-  a.peer = b as never;
-  b.peer = a as never;
+  const a = new MemoryTransport(), b = new MemoryTransport();
+  a.peer = b;
+  b.peer = a;
   return [a, b];
 }
 

@@ -9,6 +9,7 @@ import type { ServerPlayer } from '../player';
 import type { Entity } from '../../common/entity/ecs';
 import { effect } from '../../common/entity/living';
 import { NO_MODIFIERS } from '../../common/item/mining';
+import { blockOf } from '../../common/block/registry';
 import { INV_ARMOR } from '../../common/entity/player';
 import { hurt, addEffect, livingHooks, hasEffect, effectAmp } from './living';
 import { createItemEntity, spawnExperience, tickDrops, dropFromPlayer } from './items';
@@ -18,6 +19,10 @@ import {
 import { dropBlockLoot, afterPlayerBreak, useItemOnBlock, useItemInAir, playerAction, damageEntityItem } from './interaction';
 import { playerAttack, tickAttack, combatHooks } from './combat';
 import { tickRecipes, recipeCrafted, sendAllRecipes, saveRecipes, loadRecipes } from './recipes';
+import { useBed, wakeUp, tickSleep, sleepingOf } from './sleep';
+import { dropContainerContents, shellBoxDrop, restoreContainer, furnaceSystem, isContainerBE, voidChestOf } from './containers';
+import { popResource } from './interaction';
+import type { SerializedStack } from '../../common/item/stack';
 
 function playerOf(server: StrataServer, e: Entity): ServerPlayer | undefined {
   return e.player ? server.players.find((p) => p.entity === e) : undefined;
@@ -128,6 +133,37 @@ function install(server: StrataServer): void {
     };
   };
 
+  for (const level of server.levels.values()) level.systems.push(furnaceSystem(level));
+  const prevBERemoved = h.blockEntityRemoved;
+  h.blockEntityRemoved = (level, be, oldState, suppress) => {
+    prevBERemoved(level, be, oldState, suppress);
+    if (suppress) return;
+    if (be.type === 'shell_box') {
+      const stack = shellBoxDrop(level, be, blockOf(oldState).name);
+      const creative = level.breaker?.player?.gameMode === 'creative';
+      if (!creative || stack.data.container) popResource(level, be.x, be.y, be.z, stack);
+      return;
+    }
+    dropContainerContents(level, be);
+  };
+  const prevPlaced = h.blockPlaced;
+  h.blockPlaced = (p, x, y, z, state, stack, hand) => {
+    prevPlaced(p, x, y, z, state, stack, hand);
+    restoreContainer(p.level, x, y, z, stack);
+  };
+  const prevBEData = h.blockEntityClientData;
+  h.blockEntityClientData = (be) => (isContainerBE(be.type) ? { name: be.data['name'] ?? null } : prevBEData(be));
+
+  h.useBed = (level, e, x, y, z) => {
+    const p = playerOf(server, e);
+    if (p) useBed(level, p, x, y, z);
+  };
+  const prevServerTick = h.serverTick;
+  h.serverTick = () => {
+    prevServerTick();
+    tickSleep(server);
+  };
+
   const prevSwing = h.swing;
   h.swing = (p, hand) => {
     prevSwing(p, hand);
@@ -139,6 +175,10 @@ function install(server: StrataServer): void {
     switch (packet.type) {
       case 'clientCommand':
         if (packet['action'] === 'respawn') respawnPlayer(server, p);
+        return;
+      case 'playerCommand':
+        if (packet['action'] === 'stop_sleeping' && sleepingOf(p)) wakeUp(p.level, p);
+        else prevPacket(p, packet);
         return;
       case 'swing':
         h.swing(p, packet['hand'] === 'off' ? 'off' : 'main');
@@ -191,22 +231,32 @@ function install(server: StrataServer): void {
   const prevLeft = h.playerLeft;
   h.playerLeft = (p) => {
     prevLeft(p);
+    if (sleepingOf(p)) wakeUp(p.level, p);
     stopUsing(p);
     p.level.tracker.forgetPlayer(p);
   };
 
   const prevSave = h.savePlayer;
-  h.savePlayer = (p) => ({ ...prevSave(p), survival: savePlayerSurvival(p), recipes: saveRecipes(p) });
+  h.savePlayer = (p) => ({ ...prevSave(p), survival: savePlayerSurvival(p), recipes: saveRecipes(p), voidChest: voidChestOf(p).toJSON() });
   const prevLoad = h.loadPlayer;
   h.loadPlayer = (p, d) => {
     prevLoad(p, d);
     if (d['survival']) loadPlayerSurvival(p.level, p, d['survival'] as Record<string, unknown>);
     loadRecipes(p, d['recipes'] as Parameters<typeof loadRecipes>[1]);
+    if (d['voidChest']) voidChestOf(p).load(d['voidChest'] as Array<SerializedStack | null>);
   };
 
   livingHooks.onDeath = (level, e, type, attacker) => {
     const p = playerOf(server, e);
-    if (p) onPlayerDeath(server, level, p, type, attacker);
+    if (!p) return;
+    if (sleepingOf(p)) wakeUp(level, p);
+    onPlayerDeath(server, level, p, type, attacker);
+  };
+  const prevHurt = livingHooks.onHurt;
+  livingHooks.onHurt = (level, e, type, amount, attacker) => {
+    prevHurt(level, e, type, amount, attacker);
+    const p = playerOf(server, e);
+    if (p && sleepingOf(p)) wakeUp(level, p);
   };
   livingHooks.onEffectsChanged = (level, e) => syncEffects(level, e);
   livingHooks.damageItem = (level, e, stack, amount) => damageEntityItem(level, e, stack, amount);

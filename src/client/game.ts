@@ -29,11 +29,13 @@ import { StatusHud } from './ui/status';
 import { h, button } from './ui/dom';
 import * as M from '../common/math/mat4';
 import { InventoryMenu, MENU_TYPES } from '../common/menu/menus';
+import '../common/menu/furnace';
 import type { Menu, MenuPlayer, ClickMode } from '../common/menu/menu';
 import { ContainerScreen } from './ui/containers';
 import { CreativeScreen } from './ui/creative';
 import { RecipeBook } from './ui/recipebook';
 import { skinPortrait } from './render/entity/player';
+import { ClientFx } from './fx';
 import { getItem } from '../common/item/items';
 
 export interface GameOptions {
@@ -64,6 +66,8 @@ export class Game {
   readonly entities: ClientEntities;
   readonly entityRenderer: EntityRenderer;
   readonly status: StatusHud;
+  readonly fx: ClientFx;
+  private readonly totemEl: HTMLImageElement;
   private deathEl: HTMLElement | null = null;
   private readonly nametags: HTMLDivElement;
   hardcore = false;
@@ -120,9 +124,11 @@ export class Game {
     this.player.entities = this.entities;
     this.entityRenderer = new EntityRenderer(opts.device, this.renderer, opts.atlas, this.level, this.entities, this.player);
     this.renderer.layers.push(this.entityRenderer);
+    this.fx = new ClientFx(this.level, this.entities, this.player, opts.atlas, this.entityRenderer);
+    this.totemEl = h('img', { class: 'totem-pop', alt: '', draggable: 'false' });
     this.status = new StatusHud(this.icons);
     this.nametags = h('div', { class: 'nametags' });
-    this.hud.root.prepend(this.nametags, this.status.root);
+    this.hud.root.prepend(this.nametags, this.status.root, this.totemEl);
     const pl = this.player;
     this.menuPlayer = {
       inventory: pl.inventory,
@@ -182,6 +188,7 @@ export class Game {
       return;
     }
     if (this.entities.handle(p)) return;
+    if (this.fx.handle(p, this.entityRenderer.breaking)) return;
     switch (p.type) {
       case 'login':
         this.entityId = p['entityId'] as number;
@@ -232,6 +239,8 @@ export class Game {
         break;
       case 'gameEvent':
         if (p['event'] === 'difficulty') this.difficulty = p['value'] as number;
+        if (p['event'] === 'sleep') this.startSleeping(p['value'] as number);
+        if (p['event'] === 'wake') this.stopSleeping();
         break;
       case 'cooldown':
         this.player.cooldowns.set(p['item'] as string, this.level.gameTime + (p['ticks'] as number));
@@ -365,6 +374,8 @@ export class Game {
   private switchDimension(dim: DimensionId): void {
     this.meshes.clear();
     this.entities.clear();
+    this.fx.particles.clear();
+    this.entityRenderer.breaking.clear();
     this.level.clear();
     this.level.dimId = dim;
     this.level.dim = DIMENSIONS[dim];
@@ -482,6 +493,11 @@ export class Game {
     this.hud.update(this.player.inventory, now);
     this.status.update(this.player, this.entities, this.level.gameTime);
     this.screen?.render();
+    this.updateTotem(partial);
+    if (this.sleepEl) {
+      const shade = this.sleepEl.firstChild as HTMLElement;
+      shade.style.opacity = String(Math.min(0.85, (this.player.sleepTicks + partial) / 100 * 0.85));
+    }
     this.updateNametags();
     if (this.hud.showDebug) this.hud.setDebug(...this.debugLines());
     else this.hud.setDebug([], []);
@@ -516,6 +532,7 @@ export class Game {
   private tick(): void {
     this.level.gameTime++;
     this.entities.tick();
+    this.fx.tick();
     if (this.level.doDaylightCycle) this.level.dayTime++;
     if (this.level.lightningFlash > 0) this.level.lightningFlash = Math.max(0, this.level.lightningFlash - 0.1);
     if (this.loaded && !this.paused) this.player.tick(this.input, this.uiOpen);
@@ -551,7 +568,18 @@ export class Game {
       const b = this.player.prevBob + (this.player.bob - this.player.prevBob) * partial;
       y += Math.abs(Math.cos(b * Math.PI)) * 0.04;
     }
-    return { x, y, z, yaw, pitch, fov };
+    let roll = 0;
+    const pl = this.player;
+    if (pl.hurtTilt > 0) {
+      const k = (pl.hurtTilt - partial) / 10;
+      roll = (-Math.sin(k * k * k * k * Math.PI) * 14 * Math.PI) / 180;
+    }
+    if (pl.dead) {
+      const d = Math.min(1, (pl.anim.deathTime + partial) / 20);
+      y -= d * (pl.entity.physics.eyeHeight - 0.2);
+      roll = (d * 40 * Math.PI) / 180;
+    }
+    return { x, y, z, yaw, pitch, fov, roll };
   }
 
   // ===========================================================================================
@@ -671,6 +699,49 @@ export class Game {
     this.uiOpen = false;
     this.input.captured = true;
     this.input.requestLock();
+  }
+
+  // ===========================================================================================
+  // Sleeping
+  // ===========================================================================================
+
+  private sleepEl: HTMLDivElement | null = null;
+
+  private startSleeping(facing: number): void {
+    this.closeScreen(true);
+    this.player.sleeping = facing;
+    this.player.sleepTicks = 0;
+    this.player.entity.physics.eyeHeight = 0.2;
+    this.uiOpen = true;
+    this.input.captured = false;
+    this.input.releaseLock();
+    const leave = button(t('sleep.leave'), () => this.conn.send({ type: 'playerCommand', action: 'stop_sleeping', data: 0 }));
+    this.sleepEl = h('div', { class: 'screen sleep' }, h('div', { class: 'sleep-shade' }), leave);
+    this.opts.uiRoot.appendChild(this.sleepEl);
+  }
+
+  private stopSleeping(): void {
+    this.player.sleeping = null;
+    this.player.entity.physics.eyeHeight = 1.62;
+    this.sleepEl?.remove();
+    this.sleepEl = null;
+    if (!this.player.dead && !this.screen) {
+      this.uiOpen = false;
+      this.input.captured = true;
+      this.input.requestLock();
+    }
+  }
+
+  /** Totem of undying pop-up animation (local player). */
+  private updateTotem(partial: number): void {
+    const k = this.fx.totemTicks;
+    if (k <= 0) { this.totemEl.style.display = 'none'; return; }
+    const t = (40 - k + partial) / 40;
+    this.totemEl.src = this.icons.icon('totem_of_undying');
+    this.totemEl.style.display = '';
+    const s = t < 0.3 ? t / 0.3 * 3 : 3 + (t - 0.3) * 2;
+    this.totemEl.style.transform = `translate(-50%, -50%) scale(${s}) rotate(${Math.sin(t * 12) * 10 * (1 - t)}deg)`;
+    this.totemEl.style.opacity = String(t > 0.7 ? (1 - t) / 0.3 : 1);
   }
 
   /** Position HTML name tags over other players. */

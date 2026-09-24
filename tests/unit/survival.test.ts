@@ -145,3 +145,118 @@ describe('Survival (in-process server)', () => {
     expect(w.player.inventory.count('bone_meal')).toBeLessThan(64);
   });
 });
+
+describe('Beds', () => {
+  it('sleeping at night skips to morning and sets the spawn point', async () => {
+    const w = await startTestWorld();
+    const lvl = w.player.level;
+    const t = w.player.entity.transform;
+    const x = Math.floor(t.x) + 1, z = Math.floor(t.z);
+    const y = lvl.getHeight('motion', x, z);
+    const bed = BLOCK_BY_NAME.get('red_bed')!;
+    const P = await import('../../src/common/block/properties');
+    const { setValue } = await import('../../src/common/block/registry');
+    lvl.setBlock(x, y, z, setValue(setValue(bed.defaultState, P.P.facing, 3), P.P.bedPart, 'foot'), 3);
+    expect(lvl.getBlockState(x, y, z + 1)).not.toBe(0);
+    w.server.dayTime = 14000;
+    lvl.useBed(w.player.entity, x, y, z);
+    expect(w.player.ext['sleeping']).toBeTruthy();
+    expect(w.player.ext['spawnPoint']).toMatchObject({ x, y, z: z + 1 });
+    await w.tick(105);
+    expect(w.server.dayTime % 24000).toBeLessThan(1000);
+    expect(w.player.ext['sleeping']).toBeUndefined();
+  });
+
+  it('refuses to sleep during the day', async () => {
+    const w = await startTestWorld();
+    const lvl = w.player.level;
+    const t = w.player.entity.transform;
+    const x = Math.floor(t.x) + 1, z = Math.floor(t.z);
+    const y = lvl.getHeight('motion', x, z);
+    const P = await import('../../src/common/block/properties');
+    const { setValue } = await import('../../src/common/block/registry');
+    lvl.setBlock(x, y, z, setValue(setValue(BLOCK_BY_NAME.get('red_bed')!.defaultState, P.P.facing, 3), P.P.bedPart, 'foot'), 3);
+    w.server.dayTime = 3000;
+    lvl.useBed(w.player.entity, x, y, z);
+    expect(w.player.ext['sleeping']).toBeUndefined();
+    expect(w.player.ext['spawnPoint']).toBeTruthy();
+  });
+});
+
+describe('Containers and furnaces', () => {
+  async function placeAt(w: Awaited<ReturnType<typeof startTestWorld>>, name: string, dx = 1, dz = 0): Promise<[number, number, number]> {
+    const lvl = w.player.level;
+    const t = w.player.entity.transform;
+    const x = Math.floor(t.x) + dx, z = Math.floor(t.z) + dz;
+    const y = lvl.getHeight('motion', x, z);
+    lvl.setBlock(x, y, z, BLOCK_BY_NAME.get(name)!.defaultState, 3);
+    w.server.hooks.blockPlaced(w.player, x, y, z, lvl.getBlockState(x, y, z), new ItemStack(name, 1), 'main');
+    return [x, y, z];
+  }
+
+  it('smelts iron ore with coal and awards experience', async () => {
+    const w = await startTestWorld();
+    const [x, y, z] = await placeAt(w, 'furnace');
+    w.player.level.openMenu(w.player.entity, 'furnace', x, y, z);
+    const m = w.player.menus.open!;
+    expect(m.kind).toBe('furnace');
+    m.slots[0]!.set(new ItemStack('raw_iron', 2));
+    m.slots[1]!.set(new ItemStack('coal', 1));
+    await w.tick(420);
+    expect(m.slots[2]!.stack.id).toBe('iron_ingot');
+    expect(m.slots[2]!.stack.count).toBe(2);
+    const lvl = w.player.level;
+    const P = await import('../../src/common/block/properties');
+    const { getValue } = await import('../../src/common/block/registry');
+    expect(getValue(lvl.getBlockState(x, y, z), P.P.lit)).toBe(true);
+    // Take the output: experience orbs appear
+    m.clicked(2, 0, 'quick_move', w.player.menus.menuPlayer);
+    expect(w.player.inventory.count('iron_ingot')).toBe(2);
+    expect([...lvl.entities.query('xpOrb')].length).toBeGreaterThan(0);
+  });
+
+  it('chests keep items and drop them when broken', async () => {
+    const w = await startTestWorld();
+    const [x, y, z] = await placeAt(w, 'chest');
+    w.player.level.openMenu(w.player.entity, 'chest', x, y, z);
+    const m = w.player.menus.open!;
+    m.slots[0]!.set(new ItemStack('diamond', 7));
+    w.player.menus.close(true);
+    const be = w.player.level.getBlockEntity(x, y, z)!;
+    expect((be.data['items'] as Array<{ id: string } | null>)[0]!.id).toBe('diamond');
+    w.player.breakBlock(x, y, z, true);
+    const items = [...w.player.level.entities.query('item')].map((e) => e.item!.stack);
+    expect(items.filter((s) => s.id === 'diamond').reduce((a, s) => a + s.count, 0)).toBe(7);
+    expect(items.some((s) => s.id === 'chest')).toBe(true);
+  });
+
+  it('shell boxes keep their contents in the dropped item', async () => {
+    const w = await startTestWorld();
+    const [x, y, z] = await placeAt(w, 'red_shell_box');
+    w.player.level.openMenu(w.player.entity, 'shell_box', x, y, z);
+    const m = w.player.menus.open!;
+    m.slots[3]!.set(new ItemStack('emerald', 5));
+    expect(m.slots[4]!.mayPlace(new ItemStack('blue_shell_box', 1))).toBe(false);
+    w.player.menus.close(true);
+    w.player.inventory.set(0, new ItemStack('wooden_pickaxe', 1));
+    w.player.breakBlock(x, y, z, true);
+    const drop = [...w.player.level.entities.query('item')].map((e) => e.item!.stack).find((s) => s.id === 'red_shell_box')!;
+    expect(drop.data.container?.[3]?.id).toBe('emerald');
+  });
+
+  it('opens a double chest with 54 slots', async () => {
+    const w = await startTestWorld();
+    const lvl = w.player.level;
+    const t = w.player.entity.transform;
+    const x = Math.floor(t.x) + 2, z = Math.floor(t.z);
+    const y = lvl.getHeight('motion', x, z);
+    const P = await import('../../src/common/block/properties');
+    const { setValue } = await import('../../src/common/block/registry');
+    const chest = BLOCK_BY_NAME.get('chest')!;
+    // Facing south (3): left half's partner is rotateCW(south) = west
+    lvl.setBlock(x, y, z, setValue(setValue(chest.defaultState, P.P.facing, 3), P.P.chestType, 'left'), 2 | 16);
+    lvl.setBlock(x - 1, y, z, setValue(setValue(chest.defaultState, P.P.facing, 3), P.P.chestType, 'right'), 2 | 16);
+    lvl.openMenu(w.player.entity, 'chest', x, y, z);
+    expect(w.player.menus.open!.slots.length).toBe(54 + 36);
+  });
+});

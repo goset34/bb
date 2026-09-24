@@ -246,3 +246,16 @@ html, body {
 .title-big { position: absolute; left: 0; right: 0; top: 30%; text-align: center; font-size: 4em; font-weight: 800; pointer-events: none; opacity: 0; }
 .hud-subtitle { position: absolute; left: 0; right: 0; top: calc(30% + 5.5em); text-align: center; font-size: 2em; pointer-events: none; opacity: 0; }
 .actionbar { position: absolute; left: 0; right: 0; bottom: 7.2em; text-align: center; pointer-events: none; opacity: 0; }
+.totem-pop { position: absolute; left: 50%; top: 45%; width: 4em; height: 4em; image-rendering: pixelated; pointer-events: none; display: none; }
+.screen.sleep { justify-content: flex-end; padding-bottom: 6em; background: transparent; }
+.sleep-shade { position: absolute; inset: 0; background: #06060c; opacity: 0; pointer-events: none; }
+.gui-label.center { text-align: center; }
+.gui-flame { position: absolute; width: 1.75em; height: 1.75em; background: radial-gradient(ellipse at 50% 70%, #6f6f6f 40%, transparent 42%); }
+.gui-flame .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 85%, #fff6a0 18%, #ffb640 35%, #e05818 52%, transparent 54%); background-size: 1.75em 1.75em; background-position: bottom; }
+.gui-progress-arrow { position: absolute; width: 3em; height: 2.125em; }
+.gui-progress-arrow::before { content: ''; position: absolute; left: 0; top: 0.75em; width: 2em; height: 0.625em; background: #8b8b8b; }
+.gui-progress-arrow::after { content: ''; position: absolute; left: 1.875em; top: 0.25em; border-left: 1.125em solid #8b8b8b; border-top: 0.8em solid transparent; border-bottom: 0.8em solid transparent; }
+.gui-progress-arrow .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; overflow: hidden; z-index: 1;
+  background: linear-gradient(#fff, #fff) 0 0.75em / 2em 0.625em no-repeat, conic-gradient(from 90deg at 1.875em 50%, transparent 0deg, transparent 0deg) ; }
+.gui-progress-arrow .fill::after { content: ''; position: absolute; left: 1.875em; top: 0.25em; border-left: 1.125em solid #fff; border-top: 0.8em solid transparent; border-bottom: 0.8em solid transparent; }

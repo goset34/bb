@@ -63,6 +63,8 @@ export class ServerPlayer {
   travelOptions: TravelOptions = { ...DEFAULT_TRAVEL };
   joined = false;
   disconnected = false;
+  /** Movement input is ignored (sleeping, credits). */
+  frozen = false;
   /** Load progress reporting during spawn. */
   private spawnChunksReported = false;
   /** Inventory menu (window 0) and the open container menu. */
@@ -199,21 +201,34 @@ export class ServerPlayer {
         }
         break;
       case 'pickBlock': {
-        if (this.data.gameMode !== 'creative') break;
+        if (this.data.gameMode === 'spectator') break;
         const s = this.level.getBlockState(p['x'] as number, p['y'] as number, p['z'] as number);
         const item = blockOf(s).item;
         if (!item) break;
         const inv = this.inventory;
         let slot = -1;
-        for (let i = 0; i < 9; i++) if (inv.get(i).is(item)) slot = i;
-        if (slot < 0) {
+        for (let i = 0; i < 9; i++) if (inv.get(i).is(item)) { slot = i; break; }
+        if (slot >= 0) {
+          inv.selected = slot;
+        } else if (this.data.gameMode === 'creative') {
           slot = inv.get(inv.selected).isEmpty() ? inv.selected : (() => {
             for (let i = 0; i < 9; i++) if (inv.get(i).isEmpty()) return i;
             return inv.selected;
           })();
           inv.set(slot, new ItemStack(item, 1));
+          inv.selected = slot;
+        } else {
+          // Survival: bring the stack from the main inventory into the hotbar
+          let from = -1;
+          for (let i = 9; i < 36; i++) if (inv.get(i).is(item)) { from = i; break; }
+          if (from < 0) break;
+          let target = inv.selected;
+          if (!inv.get(target).isEmpty()) for (let i = 0; i < 9; i++) if (inv.get(i).isEmpty()) { target = i; break; }
+          const a = inv.get(target), b = inv.get(from);
+          inv.set(target, b);
+          inv.set(from, a);
+          inv.selected = target;
         }
-        inv.selected = slot;
         this.syncInventory();
         break;
       }
@@ -233,7 +248,7 @@ export class ServerPlayer {
 
   /** Process queued inputs (called every server tick). */
   processInputs(): void {
-    if (this.awaitingTeleport) {
+    if (this.awaitingTeleport || this.frozen) {
       this.inputQueue.length = 0;
       return;
     }
@@ -390,7 +405,9 @@ export class ServerPlayer {
     const drops = withDrops && this.data.gameMode !== 'creative';
     level.levelEvent(2001, x, y, z, s);
     const keep = (stateFlags[s]! & F.WATERLOGGED) ? level.getBlockDef('water').defaultState : 0;
+    level.breaker = this.entity;
     level.setBlock(x, y, z, keep, 3);
+    level.breaker = null;
     level.gameEvent('block_destroy', x, y, z, this.entity, s);
     if (drops) this.server.hooks.afterBreak(this, x, y, z, s);
     return true;

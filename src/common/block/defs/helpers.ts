@@ -7,7 +7,7 @@ import {
 } from '../model';
 import {
   model, slabElements, stairsElements, tex3, Tex3, fenceElements, fenceShape, fenceGateElements, fenceGateShape,
-  wallElements, wallShape, paneElements, paneShape, doorElements, doorShape, trapdoorElements, trapdoorBox,
+  wallElements, wallShape, doorElements, doorShape, trapdoorElements, trapdoorBox,
   buttonElements, buttonShape, pressurePlateElements, StairShape, WallSide, AttachFace, flowerPotElements, facingRot,
 } from '../shapes';
 import { Direction, UP, DOWN, NORTH, SOUTH, WEST, EAST } from '../../world/direction';

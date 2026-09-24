@@ -197,7 +197,16 @@ export function renderHumanoid(ctx: RenderContext, e: ClientEntity, x: number, y
   mesh.hurt = i.hurtTime > 0 || i.deathTime > 0 ? 1 : 0;
   mesh.push();
   mesh.translate(x, y, z);
-  mesh.rotate(1, (-bodyYaw * Math.PI) / 180);
+  const sleeping = e.data['sleeping'] === true;
+  if (sleeping) {
+    // Lie on the back with the head on the pillow (facing = bed head direction)
+    const f = (e.data['bedFacing'] as number | undefined) ?? 3;
+    const fx = [0, 0, 0, 0, -1, 1][f]!, fz = [0, 0, -1, 1, 0, 0][f]!;
+    const yaw = [0, 0, 180, 0, 90, 270][f]!;
+    mesh.translate(-fx * 1.3, -0.15, -fz * 1.3);
+    mesh.rotate(1, (-(yaw + 180) * Math.PI) / 180);
+    mesh.rotate(0, -Math.PI / 2);
+  } else mesh.rotate(1, (-bodyYaw * Math.PI) / 180);
   if (i.deathTime > 0) {
     const d = Math.min(1, Math.sqrt((i.deathTime + p - 1) / 20 * 1.6));
     mesh.rotate(2, (d * Math.PI) / 2);

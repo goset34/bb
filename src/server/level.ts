@@ -59,6 +59,8 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
   skyDarken = 0;
   /** Extension hooks for later milestones (redstone wire cache, raids, dragon fight…). */
   readonly systems: Array<{ name: string; tick(level: ServerLevel): void }> = [];
+  /** Entity breaking the block currently being removed (transient, for drop decisions). */
+  breaker: Entity | null = null;
   /** Per-tick timing (ms) for the profiler. */
   readonly timings: Record<string, number> = {};
 
@@ -135,8 +137,12 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
     const moved = (flags & UPDATE_MOVE_BY_PISTON) !== 0;
     // Block entities
     if (oldBlock !== newBlock) {
-      if (stateFlags[old]! & F.HAS_BE) c.removeBlockEntity(x & 15, y, z & 15);
       oldBlock.behavior.onRemove(old, this, x, y, z, state, moved);
+      if (stateFlags[old]! & F.HAS_BE) {
+        const be = c.getBlockEntity(x & 15, y, z & 15);
+        if (be && !moved) this.server.hooks.blockEntityRemoved(this, be, old, (flags & UPDATE_SUPPRESS_DROPS) !== 0);
+        c.removeBlockEntity(x & 15, y, z & 15);
+      }
     }
     this.light.onBlockChanged(x, y, z, old, state);
     if (flags & UPDATE_CLIENTS) this.markBlockChanged(x, y, z);
@@ -555,6 +561,10 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
   openMenu(player: Entity, kind: string, x: number, y: number, z: number): void {
     const p = this.players.find((pl) => pl.entity === player);
     p?.menus.openMenu(kind, { x, y, z });
+  }
+
+  useBed(player: Entity, x: number, y: number, z: number): void {
+    this.server.hooks.useBed(this, player, x, y, z);
   }
 
   /** Run a feature against the live world; writes notify clients and neighbours. */

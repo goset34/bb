@@ -159,7 +159,6 @@ function build(): Map<number, Set<PlacedFeature>> {
     [TREES.hugeBrownMushroom(), 0.025], [TREES.hugeRedMushroom(), 0.05], [TREES.darkOak(), 0.667], [TREES.birch(), 0.2], [TREES.fancyOak(), 0.1]], TREES.oak()), 16);
   const treesPale = trees('pale_garden_vegetation', selector([[TREES.paleOak(), 0.9]], TREES.paleOak()), 16);
   const treesTaiga = trees('trees_taiga', selector([[TREES.pine(), 0.33]], TREES.spruce()), 10);
-  const treesSnowy = trees('trees_snowy', TREES.spruce(), [[0, 9], [1, 1]]);
   const treesGrove = trees('trees_grove', TREES.spruce(), 10);
   const treesOldPine = trees('trees_old_growth_pine_taiga', selector([[TREES.megaSpruce(), 0.025], [TREES.megaPine(), 0.3], [TREES.pine(), 0.33]], TREES.spruce()), 10);
   const treesOldSpruce = trees('trees_old_growth_spruce_taiga', selector([[TREES.megaSpruce(), 0.33], [TREES.pine(), 0.33]], TREES.spruce()), 10);

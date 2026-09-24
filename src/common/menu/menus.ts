@@ -373,3 +373,23 @@ export class GenericMenu extends Menu {
 }
 
 MENU_TYPES.set('generic', (c) => new GenericMenu('generic', c.windowId, new SimpleContainer(c.size), c.inventory));
+
+/** Shell box slots refuse other shell boxes (no nesting). */
+export class ShellBoxSlot extends Slot {
+  override mayPlace(s: ItemStack): boolean {
+    return !s.id.endsWith('shell_box');
+  }
+}
+
+for (const kind of ['chest', 'barrel', 'void_chest']) MENU_TYPES.set(kind, (c) => new GenericMenu(kind, c.windowId, new SimpleContainer(c.size || 27), c.inventory));
+MENU_TYPES.set('shell_box', (c) => {
+  const container = new SimpleContainer(c.size || 27);
+  const m = new GenericMenu('shell_box', c.windowId, container, c.inventory);
+  for (let i = 0; i < container.size; i++) {
+    const s = m.slots[i]!;
+    const r = new ShellBoxSlot(s.container, s.slot, s.x, s.y);
+    r.index = i;
+    m.slots[i] = r;
+  }
+  return m;
+});

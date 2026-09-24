@@ -4,7 +4,7 @@
  */
 import { BlockBehavior, InteractionResult } from '../behavior';
 import {
-  blockOf, getValue, setValue, tryGetValue, isFaceSturdy, stateFlags, F, hasTag, S, Block, isBlock, getBlock,
+  blockOf, getValue, setValue, tryGetValue, isFaceSturdy, stateFlags, F, hasTag, Block, isBlock, getBlock,
 } from '../registry';
 import { P } from '../properties';
 import type { LevelAccess, PlaceContext, UseContext } from '../../world/level';
@@ -807,6 +807,10 @@ export class ChestBehavior extends FacingPlayerBehavior {
 }
 
 export class BedBehavior extends BlockBehavior {
+  override use(_state: number, level: LevelAccess, x: number, y: number, z: number, ctx: UseContext): InteractionResult {
+    if (!level.isClient) level.useBed(ctx.player, x, y, z);
+    return 'success';
+  }
   override getStateForPlacement(ctx: PlaceContext): number | null {
     const f = ctx.horizontalDirection();
     const hx = ctx.x + DX[f]!, hz = ctx.z + DZ[f]!;

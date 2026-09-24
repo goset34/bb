@@ -15,6 +15,8 @@ import type { ClientLevel } from '../../world';
 import { ClientEntities, ClientEntity } from '../../entities';
 import type { LocalPlayer } from '../../player';
 import type { AtlasData } from '../textures/atlas';
+import type { ParticleEngine } from '../particles/particles';
+import { getOutlineShape } from '../../../common/block/registry';
 import * as M from '../../../common/math/mat4';
 import { lookVector } from '../../../common/math/geom';
 import { getItem } from '../../../common/item/items';
@@ -51,10 +53,15 @@ export class EntityRenderer implements WorldLayer {
   private readonly handModel = createPlayerModel();
   showHand = true;
   localSkin = 'player/';
+  particles: ParticleEngine | null = null;
+  /** Block break progress by breaker id: position and stage 0..9. */
+  readonly breaking = new Map<number, { x: number; y: number; z: number; stage: number }>();
+  private readonly destroyLayers: number[];
 
   constructor(private readonly device: Device, private readonly world: WorldRenderer, atlas: AtlasData, private readonly level: ClientLevel, private readonly entities: ClientEntities, private readonly player: LocalPlayer) {
     this.textures = new EntityTextures(device);
     this.items = new ItemModels(atlas);
+    this.destroyLayers = Array.from({ length: 10 }, (_, i) => (atlas.index[`destroy_stage_${i}`] ?? 0) & 0xfff);
     this.drawUbo = device.createBuffer('uniform', DRAW_SLOT * 2);
     this.pipe = device.createPipeline({
       label: 'entities', shader: ENTITY_SHADER, vertexBuffers: [LAYOUT],
@@ -125,6 +132,8 @@ export class EntityRenderer implements WorldLayer {
       const [x, y, z] = [lp.transform.px + (lp.transform.x - lp.transform.px) * partial, lp.transform.py + (lp.transform.y - lp.transform.py) * partial, lp.transform.pz + (lp.transform.z - lp.transform.pz) * partial];
       renderHumanoid(ctx, lp, x - cam.x, y - cam.y, z - cam.z, this.localSkin);
     }
+    this.particles?.render(mesh, this.textures, ctx.cam, ctx.right, ctx.up, partial);
+    this.renderCracks(cam);
     this.worldQuads = mesh.quads;
     if (mesh.count > 0) this.vbuf = this.upload(this.vbuf, mesh.bytes);
     // First-person hand
@@ -144,6 +153,42 @@ export class EntityRenderer implements WorldLayer {
     d.set(this.handProj, DRAW_SLOT / 4);
     d[DRAW_SLOT / 4 + 16] = 1;
     this.device.writeBuffer(this.drawUbo, 0, d);
+  }
+
+  /** Destroy-stage overlays on blocks being mined (local player and others). */
+  private renderCracks(cam: Camera): void {
+    const mesh = this.mesh;
+    const all = [...this.breaking.values()];
+    const d = this.player.digging;
+    if (d) all.push({ x: d.x, y: d.y, z: d.z, stage: Math.min(9, Math.floor(d.progress * 10)) });
+    for (const b of all) {
+      if (b.stage < 0) continue;
+      const shape = getOutlineShape(this.level.getBlockState(b.x, b.y, b.z));
+      if (!shape.length) continue;
+      const l = this.level.getLight(b.x, b.y, b.z);
+      mesh.sky = (l >> 4) / 15;
+      mesh.block = (l & 15) / 15;
+      mesh.hurt = 0;
+      mesh.layer = this.destroyLayers[b.stage]!;
+      mesh.flags = 0;
+      mesh.setColor(0xffffff);
+      const e = 0.003;
+      for (let i = 0; i < shape.length; i += 6) {
+        const x0 = shape[i]! - e, y0 = shape[i + 1]! - e, z0 = shape[i + 2]! - e, x1 = shape[i + 3]! + e, y1 = shape[i + 4]! + e, z1 = shape[i + 5]! + e;
+        mesh.push();
+        mesh.translate(b.x - cam.x, b.y - cam.y, b.z - cam.z);
+        const faces: Array<[number[], number[], number, number, number]> = [
+          [[x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0], [x0, z0, x0, z1, x1, z1, x1, z0], 0, 1, 0],
+          [[x0, y0, z1, x0, y0, z0, x1, y0, z0, x1, y0, z1], [x0, 1 - z1, x0, 1 - z0, x1, 1 - z0, x1, 1 - z1], 0, -1, 0],
+          [[x0, y1, z1, x0, y0, z1, x1, y0, z1, x1, y1, z1], [x0, 1 - y1, x0, 1 - y0, x1, 1 - y0, x1, 1 - y1], 0, 0, 1],
+          [[x1, y1, z0, x1, y0, z0, x0, y0, z0, x0, y1, z0], [1 - x1, 1 - y1, 1 - x1, 1 - y0, 1 - x0, 1 - y0, 1 - x0, 1 - y1], 0, 0, -1],
+          [[x0, y1, z0, x0, y0, z0, x0, y0, z1, x0, y1, z1], [z0, 1 - y1, z0, 1 - y0, z1, 1 - y0, z1, 1 - y1], -1, 0, 0],
+          [[x1, y1, z1, x1, y0, z1, x1, y0, z0, x1, y1, z0], [1 - z1, 1 - y1, 1 - z1, 1 - y0, 1 - z0, 1 - y0, 1 - z0, 1 - y1], 1, 0, 0],
+        ];
+        for (const [p, uv, nx, ny, nz] of faces) mesh.quad(p, uv, nx, ny, nz, 1);
+        mesh.pop();
+      }
+    }
   }
 
   /** A client entity view of the local player (for third-person rendering). */
@@ -169,6 +214,8 @@ export class EntityRenderer implements WorldLayer {
     v.data['sneaking'] = pe.input.sneaking && !pe.input.flying;
     v.data['using'] = this.player.hand.using;
     v.data['swimming'] = pe.input.swimming;
+    v.data['sleeping'] = this.player.sleeping !== null;
+    v.data['bedFacing'] = this.player.sleeping ?? 3;
     return v;
   }
 
@@ -188,50 +235,51 @@ export class EntityRenderer implements WorldLayer {
     // Sway with view bobbing
     const b = this.player.prevBob + (this.player.bob - this.player.prevBob) * partial;
     const bobX = Math.sin(b * Math.PI) * 0.03, bobY = -Math.abs(Math.cos(b * Math.PI)) * 0.04;
+    const D = Math.PI / 180;
+    const swingArc = Math.sin(sq * Math.PI);
     mesh.push();
-    mesh.translate(bobX, bobY, 0);
+    mesh.translate(bobX, bobY - (1 - equip) * 0.6, 0);
     if (stack.isEmpty()) {
-      // Bare arm
-      mesh.translate(0.64 - Math.sin(sq * Math.PI) * 0.3, -0.6 + Math.sin(sq * Math.PI * 2) * 0.4 - (1 - equip) * 0.6, -0.72 - Math.sin(swing * Math.PI) * 0.4);
-      mesh.rotate(1, (45 * Math.PI) / 180);
-      mesh.rotate(1, (Math.sin(sq * Math.PI) * 70 * Math.PI) / 180);
-      mesh.rotate(2, (-Math.sin(swing * swing * Math.PI) * 20 * Math.PI) / 180);
-      mesh.translate(-1, 3.6, 3.5);
-      mesh.rotate(2, (120 * Math.PI) / 180);
-      mesh.rotate(0, (200 * Math.PI) / 180);
-      mesh.rotate(1, (-135 * Math.PI) / 180);
-      mesh.translate(5.6, 0, 0);
+      // Bare arm reaching forward from the lower right; the swing punches it forward
+      mesh.translate(0.5 - swingArc * 0.25, -0.32 + Math.sin(sq * Math.PI * 2) * 0.12, -0.42 - Math.sin(swing * Math.PI) * 0.3);
+      mesh.rotate(1, (4 + swingArc * 40) * D);
+      mesh.rotate(0, (84 - swingArc * 20) * D);
+      mesh.rotate(2, (-8 - Math.sin(swing * swing * Math.PI) * 15) * D);
+      mesh.scale(0.85);
       mesh.layer = this.textures.layer(this.localSkin);
       mesh.flags = TEX_SKIN;
       mesh.setColor(0xffffff);
       const arm = this.handModel.rightArm;
       arm.reset();
-      arm.x = -5; arm.y = 2; arm.z = 0;
+      arm.x = 1; arm.y = 0; arm.z = 0;
       arm.render(mesh, ENTITY_TEX);
     } else {
       const model = this.items.get(stack.id);
       if (model) {
-        // Swing arc and equip lowering
-        mesh.translate(-0.4 * Math.sin(sq * Math.PI), 0.2 * Math.sin(sq * Math.PI * 2), -0.2 * Math.sin(swing * Math.PI));
-        mesh.translate(0.56, -0.52 - (1 - equip) * 0.6, -0.72);
-        if (hs.using && getItem(stack.id)?.food || hs.using && getItem(stack.id)?.useAnim === 'drink') {
-          const k = Math.min(1, hs.useTicks / 6);
-          mesh.translate(-0.4 * k, 0.12 * k + Math.abs(Math.cos((hs.useTicks + partial) / 4 * Math.PI)) * 0.05 * k, 0.1 * k);
-          mesh.rotate(1, (-60 * k * Math.PI) / 180);
-        }
-        const sw = Math.sin(swing * swing * Math.PI), sw2 = Math.sin(sq * Math.PI);
-        mesh.rotate(1, ((45 + sw * -20) * Math.PI) / 180);
-        mesh.rotate(2, (sw2 * -20 * Math.PI) / 180);
-        mesh.rotate(0, (sw2 * -80 * Math.PI) / 180);
-        mesh.rotate(1, (-45 * Math.PI) / 180);
+        const def = getItem(stack.id);
+        const eating = hs.using && (def?.food || def?.useAnim === 'drink');
+        // Swing arc
+        mesh.translate(-0.35 * swingArc, 0.18 * Math.sin(sq * Math.PI * 2), -0.2 * Math.sin(swing * Math.PI));
         if (model.kind === 'block' && model.cube) {
-          mesh.rotate(1, (45 * Math.PI) / 180);
-          mesh.scale(0.4);
+          mesh.translate(0.5, -0.42, -0.86);
+          if (eating) mesh.translate(-0.3, 0.12, 0.1);
+          mesh.rotate(0, -swingArc * 60 * D);
+          mesh.rotate(1, 45 * D);
+          mesh.rotate(0, 12 * D);
+          mesh.scale(0.24);
         } else {
-          const tool = getItem(stack.id)?.tool;
-          mesh.rotate(1, (-90 * Math.PI) / 180);
-          mesh.rotate(2, ((tool ? 25 : 10) * Math.PI) / 180);
-          mesh.scale(tool ? 0.68 : 0.55);
+          mesh.translate(0.44, -0.31, -0.66);
+          if (eating) {
+            const k = Math.min(1, hs.useTicks / 6);
+            mesh.translate(-0.36 * k, 0.1 * k + Math.abs(Math.cos(((hs.useTicks + partial) / 4) * Math.PI)) * 0.04 * k, 0.12 * k);
+            mesh.rotate(1, -50 * k * D);
+          }
+          mesh.rotate(0, -swingArc * 70 * D);
+          mesh.rotate(2, -Math.sin(swing * swing * Math.PI) * 20 * D);
+          // Mirror the sprite so tools point up-left from the hand, turned slightly sideways
+          mesh.rotate(1, (180 - 28) * D);
+          mesh.rotate(2, (def?.tool ? 8 : 0) * D);
+          mesh.scale(def?.tool ? 0.38 : 0.32);
         }
         emitItem(mesh, model, stack);
       }

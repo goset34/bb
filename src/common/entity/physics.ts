@@ -560,7 +560,6 @@ export const DEFAULT_TRAVEL: TravelOptions = {
 export function tickLivingMovement(world: PhysicsWorld, e: PE & { input: MoveInput }, opts: TravelOptions = DEFAULT_TRAVEL): void {
   const p = e.physics;
   const inp = e.input;
-  const t = e.transform;
   if (p.noJumpDelay > 0) p.noJumpDelay--;
   // Kill tiny velocities
   if (Math.abs(p.vx) < 0.003) p.vx = 0;

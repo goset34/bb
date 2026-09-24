@@ -278,6 +278,7 @@ export class PredictionLevel implements LevelAccess {
   placeFeature(): boolean { return false; }
   dropBlockLoot(): void {}
   openMenu(): void {}
+  useBed(): void {}
 }
 
 export type { Block, PlaceContext, ItemStack, Direction };

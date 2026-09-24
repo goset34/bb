@@ -8,7 +8,7 @@ import { registerChestLoot } from './loot/chests';
 import './loot/blocks';
 import { attachBehaviors } from './block/behaviors/index';
 import { registerGrowthBehaviors, wrapGrowthBehaviors } from './block/behaviors/growth';
-import { registerStationBehaviors } from './block/behaviors/stations';
+import { registerStationBehaviors, wrapStationBehaviors } from './block/behaviors/stations';
 import { registerEffects } from './effect/effects';
 import { hashString } from './math/random';
 
@@ -25,6 +25,7 @@ export function initRegistries(pre?: StateTables): void {
   registerStationBehaviors();
   attachBehaviors();
   wrapGrowthBehaviors();
+  wrapStationBehaviors();
   registerEffects();
   registerRecipes();
   registerChestLoot();

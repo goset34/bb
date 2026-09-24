@@ -289,7 +289,7 @@ class Region3x3 implements GenRegion {
   private readonly chunks: (Chunk | null)[] = [];
   private readonly pendingBE: Array<{ x: number; y: number; z: number; type: string; data: Record<string, unknown> }> = [];
 
-  constructor(private readonly mgr: ChunkManager, readonly centerX: number, readonly centerZ: number, readonly seed: WorldSeed, readonly dim: DimensionType) {
+  constructor(readonly mgr: ChunkManager, readonly centerX: number, readonly centerZ: number, readonly seed: WorldSeed, readonly dim: DimensionType) {
     this.minY = dim.minY;
     this.maxY = dim.minY + dim.height;
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) this.chunks.push(mgr.getChunk(centerX + dx, centerZ + dz) ?? null);

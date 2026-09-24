@@ -114,7 +114,8 @@ export function popResource(level: ServerLevel, x: number, y: number, z: number,
 export function dropBlockLoot(level: ServerLevel, x: number, y: number, z: number, state: number, breaker: Entity | null, tool: ItemStack | null, explosion?: number): void {
   if (level.getGameRule('doTileDrops') === false) return;
   const b = blockOf(state);
-  if (b.settings.noDrops) return;
+  // Shell boxes drop themselves with their contents when their block entity is removed
+  if (b.settings.noDrops || b.name.endsWith('shell_box')) return;
   const drops = rollLoot(`blocks/${b.name}`, {
     rng: level.random, tool, state, explosion,
     flags: { player: !!breaker?.player },

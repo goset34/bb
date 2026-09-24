@@ -4,12 +4,13 @@
  * number-key swaps, off-hand swap, Q throw, middle-click clone). Clicks are predicted locally on
  * the client copy of the menu and sent to the server, which answers with authoritative slots.
  */
-import { h, clear } from './dom';
+import { h } from './dom';
 import type { IconRenderer } from './icons';
 import { renderStack } from './slotview';
 import { tooltipElement } from './tooltip';
 import { Menu, MenuPlayer, ClickMode, SLOT_OUTSIDE, Slot } from '../../common/menu/menu';
 import { CraftingMenuBase } from '../../common/menu/menus';
+import type { FurnaceMenu } from '../../common/menu/furnace';
 import { resolveText, t, TextComponent } from '../../common/lang/i18n';
 import { ItemStack } from '../../common/item/stack';
 import { RecipeBook } from './recipebook';
@@ -38,6 +39,8 @@ export interface ScreenLayout {
   width: number;
   height: number;
   decorate(panel: HTMLElement, menu: Menu, title: string): void;
+  /** Per-frame update of dynamic parts (progress bars). */
+  update?(panel: HTMLElement, menu: Menu): void;
   /** Shows the recipe book button. */
   recipeBook?: boolean;
 }
@@ -82,6 +85,25 @@ SCREEN_LAYOUTS.set('generic', (m) => {
   };
 });
 
+for (const kind of ['furnace', 'blast_furnace', 'smoker']) {
+  SCREEN_LAYOUTS.set(kind, () => ({
+    width: 176, height: 166,
+    decorate(panel, _m, title) {
+      panel.appendChild(h('div', { class: 'gui-label center', style: { left: 0, right: 0, top: px(6) } }, title));
+      panel.appendChild(label(t('container.inventory'), 8, 72));
+      panel.appendChild(h('div', { class: 'gui-flame', style: { left: px(56), top: px(36) } }, h('div', { class: 'fill' })));
+      panel.appendChild(h('div', { class: 'gui-progress-arrow', style: { left: px(79), top: px(34) } }, h('div', { class: 'fill' })));
+    },
+    update(panel, m) {
+      const fm = m as FurnaceMenu;
+      const flame = panel.querySelector('.gui-flame .fill') as HTMLElement | null;
+      const arrowEl = panel.querySelector('.gui-progress-arrow .fill') as HTMLElement | null;
+      if (flame) flame.style.height = `${Math.ceil(fm.burnProgress * 13) / 13 * 100}%`;
+      if (arrowEl) arrowEl.style.width = `${Math.floor(fm.cookProgress * 24) / 24 * 100}%`;
+    },
+  }));
+}
+
 export class ContainerScreen {
   readonly el: HTMLDivElement;
   private readonly panel: HTMLDivElement;
@@ -102,9 +124,12 @@ export class ContainerScreen {
   private lastClickSlot: Slot | null = null;
   private lastClickButton = -1;
 
+  private readonly layout: ScreenLayout;
+
   constructor(private readonly host: ScreenHost, readonly menu: Menu, readonly title: TextComponent | string) {
     const layoutFn = SCREEN_LAYOUTS.get(menu.kind) ?? SCREEN_LAYOUTS.get('generic')!;
     const layout = layoutFn(menu);
+    this.layout = layout;
     this.panel = h('div', { class: 'gui-panel', style: { width: px(layout.width), height: px(layout.height) } });
     layout.decorate(this.panel, menu, typeof title === 'string' ? title : resolveText(title));
     for (const s of menu.slots) {
@@ -145,6 +170,7 @@ export class ContainerScreen {
   /** Refresh slot contents (called every frame; cheap when nothing changed). */
   render(): void {
     const m = this.menu;
+    this.layout.update?.(this.panel, m);
     const key = m.slots.map((s) => { const st = s.stack; return st.isEmpty() ? '' : `${st.id}:${st.count}:${st.damage}:${st.hasEnchants() ? 1 : 0}`; }).join('|') + '#' + (m.carried.isEmpty() ? '' : `${m.carried.id}:${m.carried.count}`) + '#' + [...this.dragSlots].map((s) => s.index).join(',');
     if (key !== this.lastRender) {
       this.lastRender = key;

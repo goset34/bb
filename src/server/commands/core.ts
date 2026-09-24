@@ -425,7 +425,10 @@ function registerCore(d: Dispatcher<S>, server: StrataServer): void {
     const cur = s.level.getBlockState(x, y, z);
     if (mode === 'keep' && !(stateFlags[cur]! & F.AIR)) return false;
     if (cur === st) return false;
-    if (mode === 'destroy') s.level.destroyBlock(x, y, z, true);
+    if (mode === 'destroy' && !(stateFlags[cur]! & F.AIR)) {
+      s.level.destroyBlock(x, y, z, true);
+      if (stateFlags[st]! & F.AIR) return true;
+    }
     s.level.removeBlockEntity(x, y, z);
     return s.level.setBlock(x, y, z, st, 3);
   };

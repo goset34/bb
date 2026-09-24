@@ -1,9 +1,9 @@
 /** Building blocks: prismarine, quartz, purpur, cinder bricks, blackstone, basalt, verge stone, copper, resin, sea blocks. */
 import {
   reg, cube, cubeBT, pillar, slab, stairs, wall, fence, button, pressurePlate, door, trapdoor, stoneLike, metalLike, P,
-  shapeOf, model, box, crossElements, BlockSettings, Tint, facingRot, rotateModel,
+  shapeOf, model, box, crossElements, BlockSettings, facingRot, rotateModel,
 } from './helpers';
-import { cubeTex, cubeColumn, Element } from '../model';
+import { cubeTex, Element } from '../model';
 import { paneElements, paneShape, lanternElements, lanternShape, torchElements, wallTorchElements } from '../shapes';
 import { Direction, NORTH, SOUTH, WEST, EAST, UP, DOWN } from '../../world/direction';
 

@@ -83,6 +83,9 @@ export class LocalPlayer {
   /** First-person hand animation. */
   readonly hand = { equip: 1, prevEquip: 1, shown: ItemStack.empty(), swing: 0, prevSwing: 0, using: false, useTicks: 0 };
   private swingTicks = -1;
+  /** Bed facing while sleeping (null = awake). Movement is frozen while asleep. */
+  sleeping: number | null = null;
+  sleepTicks = 0;
   /** Item cooldowns (item id → end tick). */
   readonly cooldowns = new Map<string, number>();
 
@@ -135,6 +138,13 @@ export class LocalPlayer {
   // ------------------------------------------------------------------------------------------
   tick(input: Input, uiOpen: boolean): void {
     if (this.dead) uiOpen = true;
+    if (this.sleeping !== null) {
+      this.sleepTicks++;
+      const t0 = this.entity.transform;
+      t0.px = t0.x; t0.py = t0.y; t0.pz = t0.z;
+      this.tickAnimation();
+      return;
+    }
     const e = this.entity;
     const t = e.transform;
     t.px = t.x; t.py = t.y; t.pz = t.z; t.pyaw = t.yaw; t.ppitch = t.pitch;

@@ -133,6 +133,10 @@ export interface ServerHooks {
   loadPlayer(p: ServerPlayer, data: Record<string, unknown>): void;
   /** A player throws/drops a stack (menus, Q key, death). */
   playerDrop(p: ServerPlayer, stack: ItemStack, randomly: boolean): void;
+  /** A block entity is being removed with its block (containers drop their contents). */
+  blockEntityRemoved(level: ServerLevel, be: BlockEntityData, oldState: number, suppressDrops: boolean): void;
+  /** Bed right-clicked by a player entity. */
+  useBed(level: ServerLevel, player: Entity, x: number, y: number, z: number): void;
   /** Items were crafted from a result slot (stats, recipe unlocks). */
   itemCrafted(p: ServerPlayer, stack: ItemStack, amount: number): void;
 }
@@ -191,6 +195,8 @@ function defaultHooks(server: StrataServer): ServerHooks {
       p.level.spawnItem(t.x, t.y + p.entity.physics.eyeHeight - 0.3, t.z, stack, -Math.sin(yaw) * Math.cos(pitch) * 0.3, -Math.sin(pitch) * 0.3 + 0.1, Math.cos(yaw) * Math.cos(pitch) * 0.3, 40);
     },
     itemCrafted() {},
+    useBed() {},
+    blockEntityRemoved() {},
   };
 }
 

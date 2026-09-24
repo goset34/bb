@@ -111,6 +111,8 @@ export interface LevelAccess extends BlockGetter {
   dropBlockLoot(x: number, y: number, z: number, state: number, breaker?: Entity | null, tool?: ItemStack | null): void;
   /** Open a block menu (crafting table, furnace, chest…) for a player. */
   openMenu(player: Entity, kind: string, x: number, y: number, z: number): void;
+  /** A player right-clicked a bed. */
+  useBed(player: Entity, x: number, y: number, z: number): void;
 }
 
 

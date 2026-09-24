@@ -4,22 +4,22 @@ declare global {
   interface Window { __strata: any }
 }
 
-async function startTestWorld(page: Page, gfx: 'webgl2' | 'webgpu', worldType = 'debug_simple'): Promise<string[]> {
+async function startTestWorld(page: Page, gfx: 'webgl2' | 'webgpu', worldType = 'debug_simple', gameMode = 'creative'): Promise<string[]> {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   await page.goto('/?gfx=' + gfx);
   await page.waitForFunction(() => window.__strata?.device, null, { timeout: 60_000 });
-  await page.evaluate(async (type) => {
+  await page.evaluate(async ([type, gameMode]) => {
     const app = window.__strata;
     app.settings.renderDistance = 4;
     await app.startWorld('e2e', {
-      name: 'E2E', seed: 'e2e', generator: { type, structures: true, bonusChest: false }, gameMode: 'creative', difficulty: 2,
+      name: 'E2E', seed: 'e2e', generator: { type, structures: true, bonusChest: false }, gameMode, difficulty: 2,
       hardcore: false, allowCommands: true, spawn: { x: 0, y: 80, z: 0 }, gameTime: 0, dayTime: 3000,
       weather: { raining: false, thundering: false, rainTime: 0, thunderTime: 0, clearTime: 0, rainLevel: 0, thunderLevel: 0 },
       rules: {}, version: 1, created: Date.now(), lastPlayed: Date.now(), data: {},
     }, false);
-  }, worldType);
+  }, [worldType, gameMode]);
   await page.waitForFunction(() => window.__strata.game?.loaded, null, { timeout: 120_000 });
   return errors;
 }
@@ -77,4 +77,32 @@ test('generates a normal world with biomes, water and vegetation', async ({ page
   expect(info.y).toBeGreaterThan(62);
   expect(info.below).not.toBe(0);
   expect(errors).toEqual([]);
+});
+
+test('survival: crafts planks through the inventory screen with the mouse', async ({ page }) => {
+  const errors = await startTestWorld(page, 'webgl2', 'flat', 'survival');
+  await page.evaluate(() => window.__strata.game.conn.send({ type: 'command', command: 'give @s oak_log 3' }));
+  await page.waitForFunction(() => window.__strata.game.player.inventory.count('oak_log') === 3, null, { timeout: 10_000 });
+  await page.evaluate(() => window.__strata.game.openInventory());
+  const slots = page.locator('.gui-panel .gui-slot');
+  await expect(slots.first()).toBeVisible();
+  // Menu slot indices: 0 result, 1-4 grid, 36 = first hotbar slot
+  await slots.nth(36).click();
+  await slots.nth(1).click();
+  await page.waitForFunction(() => window.__strata.game.invMenu.slots[0].stack.id === 'oak_planks', null, { timeout: 5_000 });
+  await slots.nth(0).click({ modifiers: ['Shift'] });
+  await page.waitForFunction(() => window.__strata.game.player.inventory.count('oak_planks') === 12, null, { timeout: 5_000 });
+  await page.keyboard.press('Escape');
+  const hud = await page.evaluate(() => document.querySelectorAll('.status .hearts i').length);
+  expect(hud).toBe(10);
+  expect(errors).toEqual([]);
+});
+
+test('commands autocomplete in the chat box', async ({ page }) => {
+  await startTestWorld(page, 'webgl2', 'flat', 'survival');
+  await page.evaluate(() => window.__strata.game.openChat('/'));
+  await page.keyboard.type('gamem');
+  await page.waitForFunction(() => document.querySelector('.chat-input .suggest')?.textContent?.includes('gamemode'), null, { timeout: 5_000 });
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.chat-input input')).toHaveValue('/gamemode');
 });
