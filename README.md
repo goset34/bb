@@ -33,13 +33,31 @@ Forzar un backend gráfico: `http://localhost:5173/?gfx=webgl2` o `?gfx=webgpu`.
 | Saltar / nadar hacia arriba | Espacio |
 | Agacharse | Mayús izq. |
 | Correr | Ctrl izq. o doble W |
-| Romper / usar | Clic izquierdo / derecho |
-| Elegir bloque (creativo) | Clic central |
+| Romper / atacar | Clic izquierdo |
+| Usar / colocar / comer | Clic derecho (mantener para comer y beber) |
+| Elegir bloque | Clic central |
 | Barra rápida | 1–9, rueda del ratón |
-| Chat / comando | T, / |
+| Inventario | E |
+| Soltar objeto / pila | Q / Ctrl+Q |
+| Cambiar de mano | F |
+| Chat / comando | T, / (Tab autocompleta, ↑↓ historial) |
 | Cambiar cámara | F5 |
 | Depuración | F3 |
 | Pausa | Esc |
+
+En las pantallas de inventario: clic izquierdo coge/deja la pila, clic derecho la mitad o una
+unidad, Mayús+clic mueve rápidamente, arrastrar reparte (izquierdo a partes iguales, derecho de
+una en una), doble clic junta, 1–9 y F intercambian con la barra rápida o la mano secundaria,
+Q/Ctrl+Q tiran desde la casilla.
+
+### Comandos
+
+`/help`, `/gamemode`, `/defaultgamemode`, `/difficulty`, `/time`, `/weather`, `/tp` (`/teleport`),
+`/give`, `/clear`, `/kill`, `/effect`, `/xp` (`/experience`), `/gamerule`, `/seed`,
+`/spawnpoint`, `/setworldspawn`, `/say`, `/me`, `/msg` (`/tell`, `/w`), `/list`, `/setblock`,
+`/fill`, `/clone`, `/recipe`, `/title`, `/tag`. Admiten selectores (`@p @a @r @s @e` con filtros
+`type`, `name`, `tag`, `gamemode`, `distance`, `level`, `x y z`, `dx dy dz`, `limit`, `sort`) y
+coordenadas absolutas, relativas (`~`) y locales (`^`).
 
 ## Pruebas
 

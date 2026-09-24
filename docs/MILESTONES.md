@@ -7,7 +7,7 @@ Cada hito deja el proyecto compilando (`npm run typecheck`), con los tests en ve
 |---|---|---|
 | H1 | ✅ | Motor: RHI WebGPU + WebGL2, chunks, mallado, cámara, física, servidor integrado |
 | H2 | ✅ | Generación del mundo y biomas (+ WASM) |
-| H3 | ⏳ | Jugador, inventario, crafteo, supervivencia |
+| H3 | ✅ | Jugador, inventario, crafteo, supervivencia |
 | H4 | ⏳ | Criaturas e IA |
 | H5 | ⏳ | Redstone, fluidos y bloques funcionales |
 | H6 | ⏳ | Ínfero y estructuras |
@@ -86,9 +86,51 @@ Incluye:
 
 ## H3 — Jugador, inventario, crafteo, supervivencia
 
-Objetos, herramientas y armaduras, inventario y contenedores, mesa de crafteo y libro de recetas,
-hornos (normal, alto, ahumador), salud, hambre, experiencia, daño, muerte y reaparición, drops y
-tablas de botín, modos de juego y sistema de comandos.
+**Criterio de aceptación:** ciclo madera → piedra → hierro → diamante jugable en supervivencia
+(prueba `tests/unit/progression.test.ts`, que recorre la cadena completa con tablas de botín,
+recetas, horno y herramientas reales).
+
+Incluye:
+
+- **Objetos**: 1376 objetos (herramientas de 7 niveles, armaduras de 8 materiales, comida con
+  efectos, cubos, pociones, discos propios…) con iconos procedurales (bloques en isométrico y
+  sprites pintados) y modelos 3D (bloques en miniatura y sprites extruidos).
+- **Recetas**: más de 900 (con forma, sin forma y especiales: tintes, fuegos artificiales,
+  estandartes, reparación, estofados…), cocina, cortapiedras y herrería; libro de recetas con
+  desbloqueo al obtener ingredientes, categorías, búsqueda y relleno automático (Mayús = todo).
+- **Menús compartidos cliente/servidor**: la misma lógica de clic se ejecuta como predicción
+  en el cliente y como autoridad en el servidor (clic, mitad, Mayús, arrastre, doble clic,
+  teclas 1–9/F, tirar, clonar). Inventario con crafteo 2×2, armadura y mano secundaria; mesa de
+  crafteo 3×3; cofres simples y dobles, cofres trampa y de cobre, barriles, cofre del vacío por
+  jugador, cajas de concha que conservan su contenido; horno, alto horno y ahumador con
+  combustible, progreso, experiencia almacenada y estado encendido. Inventario creativo con
+  pestañas, búsqueda y papelera.
+- **Supervivencia**: salud con absorción, hambre/saturación/agotamiento y regeneración de
+  referencia, aire y ahogamiento, fuego y lava, congelación, asfixia, vacío, daño de caída con
+  multiplicadores, armadura/dureza/protección/resistencia, ventana de invulnerabilidad, tótem,
+  efectos de estado con modificadores de atributo, comer y beber con animación, experiencia y
+  orbes, muerte con mensajes propios, drops, pantalla de muerte y reaparición (cama, ancla o
+  aparición del mundo), modo extremo. Camas: punto de reaparición, dormir y saltar la noche con
+  la regla de porcentaje.
+- **Interacción**: drops por tablas de botín con herramienta adecuada, experiencia de menas,
+  durabilidad con irrompibilidad, harina de hueso, azada, pala, hacha (descortezar, raspar,
+  desencerar), panal, mechero y carga ígnea, tijeras en calabazas, cubos (agua, lava, nieve
+  polvo, peces), frascos, equipar armadura con clic derecho, soltar y cambiar de mano.
+- **Combate cuerpo a cuerpo**: recarga por velocidad de ataque, críticos, empuje al esprintar,
+  barrido de espada, durabilidad del arma; ganchos para encantamientos (H8).
+- **Entidades en el cliente**: interpolación, objetos en el suelo (girando, apilados, animación
+  de recogida), orbes de experiencia, jugadores con modelo por partes, pieles procedurales
+  según el nombre, armadura, objetos en mano, poses (agachado, nadando, durmiendo, muerte),
+  etiquetas de nombre; mano y objeto en primera persona con balanceo y re-equipado.
+- **Partículas**: restos de bloques al romper y minar, polvo al caer, críticos, barrido, humo,
+  llamas, burbujas, remolinos de efectos, tótem, cera; grietas de minado.
+- **HUD**: corazones (veneno, marchitez, congelación, absorción, extremo, parpadeo y temblor),
+  armadura, comida, burbujas, barra y nivel de experiencia, mano secundaria, indicador de
+  ataque, efectos activos, títulos y barra de acción, avisos, viñeta y escarcha.
+- **Comandos**: despachador propio con árbol de nodos, permisos, selectores con filtros,
+  coordenadas relativas/locales, autocompletado y 26 comandos (véase README).
+- **Pruebas**: menús (13), supervivencia/camas/contenedores/hornos (17), progresión completa y
+  E2E de crafteo con ratón y autocompletado.
 
 ## H4 — Criaturas e IA
 

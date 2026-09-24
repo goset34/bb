@@ -139,7 +139,7 @@ export class EntityRenderer implements WorldLayer {
     // First-person hand
     this.hand.reset();
     this.handQuads = 0;
-    if (this.player.thirdPerson === 0 && this.showHand && this.player.gameMode !== 'spectator') {
+    if (this.player.thirdPerson === 0 && this.showHand && this.player.gameMode !== 'spectator' && !this.player.dead && this.player.sleeping === null) {
       this.buildHand(partial);
       this.handQuads = this.hand.quads;
       if (this.hand.count > 0) this.hbuf = this.upload(this.hbuf, this.hand.bytes);
