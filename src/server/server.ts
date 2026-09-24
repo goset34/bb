@@ -16,6 +16,7 @@ import { GameMode } from '../common/entity/player';
 import { Entity } from '../common/entity/ecs';
 import { ItemStack } from '../common/item/stack';
 import { AABB } from '../common/math/geom';
+import type { WorldAccess } from '../common/worldgen/features/api';
 import type { Chunk, BlockEntityData } from '../common/world/chunk';
 import type { MiningModifiers } from '../common/item/mining';
 import { NO_MODIFIERS } from '../common/item/mining';
@@ -101,6 +102,8 @@ export interface ServerHooks {
   tickEntities(level: ServerLevel): void;
   tickChunk(level: ServerLevel, c: Chunk): void;
   chunkLoaded(level: ServerLevel, c: Chunk): void;
+  /** A new chunk was decorated: place its initial creatures through the region. */
+  chunkDecorated(level: ServerLevel, region: WorldAccess, cx: number, cz: number): void;
   chunkUnloading(level: ServerLevel, c: Chunk): void;
   /** Autosave of a loaded chunk (persist its entities without removing them). */
   chunkSaving(level: ServerLevel, c: Chunk): void;
@@ -162,6 +165,7 @@ function defaultHooks(server: StrataServer): ServerHooks {
     tickEntities() {},
     tickChunk() {},
     chunkLoaded() {},
+    chunkDecorated() {},
     chunkUnloading() {},
     chunkSaving() {},
     chunkSent() {},

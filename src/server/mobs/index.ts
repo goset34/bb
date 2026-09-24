@@ -29,6 +29,8 @@ import { dispatchVibration, trackMovementVibrations } from './vibrations';
 import { tickWarning } from './defs/deepdark';
 import { groanerHeartSystem, heartBroken } from './defs/special';
 import { explosionHooks } from '../combat/explosion';
+import { trySpawnGolem } from './defs/golems';
+import { naturalSpawnSystem, phantomSystem, spawnerSystem, spawnInitialCreatures } from './spawning';
 import { blockOf } from '../../common/block/registry';
 import { fromBucket, axolotlAssist } from './defs/aquatic';
 import { harvestHive, hiveBroken, hivePlaced, hiveSystem } from './defs/bees';
@@ -399,8 +401,17 @@ function install(server: StrataServer): void {
   h.blockPlaced = (p, x, y, z, state, stack, hand) => {
     prevPlaced(p, x, y, z, state, stack, hand);
     if (stack.data.bees || stack.data.honey) hivePlaced(p.level, x, y, z, stack);
+    const placed = blockOf(state).name;
+    if (placed === 'carved_pumpkin' || placed === 'jack_o_lantern') trySpawnGolem(p.level, x, y, z, p);
   };
-  for (const level of server.levels.values()) level.systems.push(hiveSystem(level), groanerHeartSystem(level));
+  for (const level of server.levels.values()) {
+    level.systems.push(hiveSystem(level), groanerHeartSystem(level), naturalSpawnSystem(level), phantomSystem(level), spawnerSystem(level));
+  }
+  const prevDecorated = h.chunkDecorated;
+  h.chunkDecorated = (level, region, cx, cz) => {
+    prevDecorated(level, region, cx, cz);
+    spawnInitialCreatures(level, region, cx, cz);
+  };
   const prevUse = h.useItem;
   h.useItem = (p, hand) => prevUse(p, hand) || useEggInAir(p, hand) || useSteeringItem(p, hand);
 

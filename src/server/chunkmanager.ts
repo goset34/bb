@@ -51,6 +51,8 @@ export interface ChunkManagerHooks {
   light(h: Holder): void;
   /** Called for FULL chunks before an autosave (persist entities). */
   beforeSave?(h: Holder): void;
+  /** Called once when a chunk has been decorated (initial creature spawns). */
+  decorated?(region: Region3x3, cx: number, cz: number): void;
 }
 
 export interface Ticket {
@@ -201,6 +203,7 @@ export class ChunkManager {
     const region = new Region3x3(this, h.x, h.z, this.seed, this.dim);
     try {
       this.generator.decorate(region, h.x, h.z);
+      this.hooks.decorated?.(region, h.x, h.z);
     } catch (e) {
       console.error('[chunks] decoration failed', h.x, h.z, e);
     }

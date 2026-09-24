@@ -895,7 +895,7 @@ function guardianDef(id: 'guardian' | 'elder_guardian'): void {
   const elder = id === 'elder_guardian';
   registerMob({
     id, attrs: elder ? { max_health: 80, attack_damage: 8, movement_speed: 0.3 } : { max_health: 30, attack_damage: 6, movement_speed: 0.5 },
-    nav: 'swim', move: 'swim', swimStyle: 'fish', waterBreather: true, hostile: true, xp: elder ? 10 : 10, persistent: elder,
+    nav: 'swim', move: 'swim', swimStyle: 'fish', waterBreather: true, hostile: true, xp: 10, persistent: elder, spawnDarkness: false,
     ...sounds(id), malus: { [PathType.WATER]: 0 },
     ambientFor(m) {
       return m.inWater ? `entity.${id}.ambient` : `entity.${id}.ambient_land`;

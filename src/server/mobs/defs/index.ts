@@ -14,3 +14,4 @@ import './aquatic';
 import './hostile';
 import './deepdark';
 import './special';
+import './golems';

@@ -90,6 +90,7 @@ export class ServerLevel implements LevelAccess, PhysicsWorld {
       onFull: (h) => this.onChunkFull(h),
       onUnload: (h) => this.onChunkUnload(h),
       beforeSave: (h) => this.server.hooks.chunkSaving(this, h.chunk!),
+      decorated: (region, cx, cz) => this.server.hooks.chunkDecorated(this, region, cx, cz),
       light: (h) => {
         this.light.invalidateCache();
         this.light.initChunk(h.chunk!, () => { h.lightReady = true; });

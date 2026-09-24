@@ -139,6 +139,8 @@ export interface MobDef {
   pickUp?(m: Mob, item: Entity): void;
   /** Items this mob may hold at all. */
   canHoldItem?(m: Mob, stack: ItemStack): boolean;
+  /** Hostile natural spawns need darkness (default true; slimes, guardians and silverfish ignore light). */
+  spawnDarkness?: boolean;
   /** Melee hits always disable a blocking shield (wardens, ravagers). */
   disablesShield?: boolean;
   /** Extra hostile targeting rule (pets sparing their owner's other pets…). */

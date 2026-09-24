@@ -511,7 +511,7 @@ export function isSlimeChunk(seed: number, cx: number, cz: number): boolean {
 }
 
 registerMob({
-  id: 'slime', attrs: { max_health: 1, movement_speed: 0.3, attack_damage: 1 }, move: 'slime', hostile: true,
+  id: 'slime', attrs: { max_health: 1, movement_speed: 0.3, attack_damage: 1 }, move: 'slime', hostile: true, spawnDarkness: false,
   xp: (m) => slimeSize(m), hurtSound: 'entity.slime.hurt', deathSound: 'entity.slime.death',
   setup(m) {
     m.goals.add(1, new SlimeFloatGoal(m));
@@ -683,7 +683,7 @@ class MergeWithStoneGoal extends Goal {
 }
 
 registerMob({
-  id: 'silverfish', attrs: { max_health: 8, movement_speed: 0.25, attack_damage: 1 }, arthropod: true, hostile: true, xp: 5, loot: null,
+  id: 'silverfish', attrs: { max_health: 8, movement_speed: 0.25, attack_damage: 1 }, arthropod: true, hostile: true, xp: 5, loot: null, spawnDarkness: false,
   ...sounds('silverfish'),
   setup(m) {
     const wake = new WakeUpFriendsGoal(m);
