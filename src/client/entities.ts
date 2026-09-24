@@ -6,7 +6,9 @@
 import type { Entity } from '../common/entity/ecs';
 import type { ClientInterp } from '../common/entity/components';
 import { makePhysics, makeTransform } from '../common/entity/components';
-import { tickItemPhysics } from '../common/entity/physics';
+import { tickItemPhysics, move } from '../common/entity/physics';
+import { raycastBlocks } from '../common/world/raycast';
+import { stateFlags, F } from '../common/block/registry';
 import { ItemStack, SerializedStack } from '../common/item/stack';
 import type { Packet } from '../common/net/protocol';
 import type { ClientLevel } from './world';
@@ -14,8 +16,22 @@ import { MOBS } from '../common/entity/mobs';
 
 /** Hitbox sizes of entity types known to the client renderer; other systems add theirs. */
 export const ENTITY_SIZES: Record<string, [number, number]> = {
-  player: [0.6, 1.8], item: [0.25, 0.25], xp_orb: [0.5, 0.5],
+  player: [0.6, 1.8], item: [0.25, 0.25], xp_orb: [0.5, 0.5], tnt: [0.98, 0.98], lightning_bolt: [0, 0],
+  arrow: [0.5, 0.5], spectral_arrow: [0.5, 0.5], trident: [0.5, 0.5], snowball: [0.25, 0.25], egg: [0.25, 0.25], void_pearl: [0.25, 0.25],
+  experience_bottle: [0.25, 0.25], small_fireball: [0.3125, 0.3125], fireball: [1, 1], wind_charge: [0.3125, 0.3125], gust_charge: [0.3125, 0.3125],
+  llama_spit: [0.25, 0.25],
 };
+
+/** Client-side flight of projectiles between server updates: [gravity, drag, water drag]. */
+const PROJECTILE_FLIGHT: Record<string, [number, number, number]> = {
+  arrow: [0.05, 0.99, 0.6], spectral_arrow: [0.05, 0.99, 0.6], trident: [0.05, 0.99, 0.99], snowball: [0.03, 0.99, 0.8], egg: [0.03, 0.99, 0.8],
+  void_pearl: [0.03, 0.99, 0.8], experience_bottle: [0.07, 0.99, 0.8], llama_spit: [0.06, 0.99, 0.8],
+  small_fireball: [0, 1, 1], fireball: [0, 1, 1], wind_charge: [0, 1, 1], gust_charge: [0, 1, 1],
+};
+
+export function isProjectileType(type: string): boolean {
+  return type in PROJECTILE_FLIGHT;
+}
 
 /** Client entity: synced metadata lives in `data` (the item stack of item entities in `stack`). */
 export type ClientEntity = Entity & Required<Pick<Entity, 'transform' | 'physics' | 'interp'>> & { data: Record<string, unknown>; stack?: ItemStack };
@@ -179,6 +195,9 @@ export class ClientEntities {
   }
 
   private applyMeta(e: ClientEntity, m: Record<string, unknown>): void {
+    // Remember when an item started being used (bow draw / crossbow load animations)
+    if ('useItem' in m && m['useItem'] !== e.data['useItem']) e.data['useStart'] = e.interp.age;
+    if ('using' in m && m['using'] === true && e.data['using'] !== true) e.data['useStart'] = e.interp.age;
     Object.assign(e.data, m);
     const info = MOBS.get(e.type);
     if (info) {
@@ -211,9 +230,17 @@ export class ClientEntities {
         i.steps--;
       } else if (e.type === 'item' || e.type === 'xp_orb') {
         tickItemPhysics(this.level, e);
+      } else if (PROJECTILE_FLIGHT[e.type]) {
+        this.flyProjectile(e);
+      } else if (e.type === 'tnt') {
+        const p = e.physics;
+        p.vy -= 0.04;
+        move(this.level, e, p.vx, p.vy, p.vz);
+        p.vx *= 0.98; p.vy *= 0.98; p.vz *= 0.98;
+        if (p.onGround) { p.vx *= 0.7; p.vz *= 0.7; p.vy *= -0.5; }
       }
       // Mobs receive their body rotation from the server; other living entities derive it
-      if (MOBS.has(e.type)) t.bodyYaw = t.yaw;
+      if (MOBS.has(e.type) || PROJECTILE_FLIGHT[e.type]) t.bodyYaw = t.yaw;
       else if (e.type !== 'item' && e.type !== 'xp_orb') this.updateBody(e);
       // Limb swing
       const dx = t.x - t.px, dz = t.z - t.pz;
@@ -229,6 +256,28 @@ export class ClientEntities {
       if (i.hurtTime > 0) i.hurtTime--;
       if (i.deathTime > 0 && i.deathTime < 20) i.deathTime++;
     }
+  }
+
+  /** Predict a projectile's flight until the next server update; stop at blocks. */
+  private flyProjectile(e: ClientEntity): void {
+    const [g, drag, waterDrag] = PROJECTILE_FLIGHT[e.type]!;
+    const p = e.physics, t = e.transform;
+    const len = Math.sqrt(p.vx * p.vx + p.vy * p.vy + p.vz * p.vz);
+    if (len < 1e-4) return;
+    const hit = raycastBlocks(this.level, t.x, t.y, t.z, p.vx / len, p.vy / len, p.vz / len, len, 'collision');
+    if (hit) {
+      t.x = hit.px - (p.vx / len) * 0.05; t.y = hit.py - (p.vy / len) * 0.05; t.z = hit.pz - (p.vz / len) * 0.05;
+      p.vx = p.vy = p.vz = 0;
+      return;
+    }
+    t.x += p.vx; t.y += p.vy; t.z += p.vz;
+    const h = Math.sqrt(p.vx * p.vx + p.vz * p.vz);
+    t.yaw = (Math.atan2(p.vx, p.vz) * 180) / Math.PI;
+    t.pitch = (Math.atan2(p.vy, h) * 180) / Math.PI;
+    const water = (stateFlags[this.level.getBlockState(Math.floor(t.x), Math.floor(t.y), Math.floor(t.z))]! & F.WATER) !== 0;
+    const f = water ? waterDrag : drag;
+    p.vx *= f; p.vy *= f; p.vz *= f;
+    p.vy -= g;
   }
 
   private updateBody(e: ClientEntity): void {

@@ -12,7 +12,9 @@ import { ItemStack } from '../../common/item/stack';
 /** Tracking range (blocks) and update interval (ticks) per entity type. */
 const RANGES: Record<string, [number, number]> = {
   player: [512, 2], item: [96, 20], xp_orb: [96, 20], falling_block: [160, 20], tnt: [160, 10],
-  arrow: [64, 20], boat: [160, 3], minecart: [128, 3], verge_dragon: [320, 3], blight: [320, 3],
+  arrow: [64, 20], spectral_arrow: [64, 20], trident: [64, 20], snowball: [64, 10], egg: [64, 10], void_pearl: [64, 10],
+  experience_bottle: [64, 10], small_fireball: [64, 10], fireball: [64, 10], wind_charge: [64, 10], gust_charge: [64, 10], llama_spit: [64, 10],
+  lightning_bolt: [256, 20], boat: [160, 3], minecart: [128, 3], verge_dragon: [320, 3], blight: [320, 3],
 };
 
 /** Builds the type-specific spawn metadata. Other systems add fields via `metaProviders`. */

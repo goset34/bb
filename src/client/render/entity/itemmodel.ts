@@ -217,3 +217,21 @@ export function emitItem(mesh: EntityMesh, model: ItemModel, stack: ItemStack | 
     mesh.quad(QP, q.uv, q.nx, q.ny, q.nz, q.shade ? -1 : 1);
   }
 }
+
+/**
+ * Sprite id for a held weapon in its current state: bows being drawn, crossbows loading or
+ * loaded. `usingTicks` is null when the item is not being used.
+ */
+export function heldSprite(stack: ItemStack, usingTicks: number | null): string {
+  if (stack.id === 'bow' && usingTicks !== null) return usingTicks >= 18 ? 'bow_pulling_2' : usingTicks >= 13 ? 'bow_pulling_1' : 'bow_pulling_0';
+  if (stack.id === 'crossbow') {
+    const charged = stack.data.charged;
+    if (charged?.length) return charged.some((s) => s.id === 'firework_rocket') ? 'crossbow_firework' : 'crossbow_arrow';
+    if (usingTicks !== null) {
+      const q = stack.getEnchant('quick_charge');
+      const f = usingTicks / (q === 0 ? 25 : 25 - 5 * q);
+      return f >= 1 ? 'crossbow_pulling_2' : f > 0.58 ? 'crossbow_pulling_1' : 'crossbow_pulling_0';
+    }
+  }
+  return stack.id;
+}

@@ -293,6 +293,8 @@ function install(server: StrataServer): void {
   const prevDeath = livingHooks.onDeath;
   livingHooks.onDeath = (level, e, type, attacker) => {
     prevDeath(level, e, type, attacker);
+    const killer = mobOf(attacker);
+    if (killer && attacker !== e) killer.def.onKill?.(killer, e);
     const m = mobOf(e);
     if (!m) return;
     if (m.def.deathSound) m.playSound(m.def.deathSound);

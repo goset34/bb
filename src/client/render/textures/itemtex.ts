@@ -1794,6 +1794,60 @@ def('spider_eye', (p) => mask(p, 'eye', { o: hex('#3a0a14'), a: hex('#8a1a2a'), 
 def('dried_kelp', (p) => mask(p, 'kelp', ramp(hex('#3a4a2a'))));
 def('chorus_fruit', (p) => mask(p, 'blob', ramp(hex('#8a5a9a'))));
 
+// ---- Weapon states (bow draw, crossbow loading and loaded) -----------------------------------
+
+/** Extra sprites for held-item states that are not items themselves. */
+export const EXTRA_ITEM_SPRITES = ['bow_pulling_0', 'bow_pulling_1', 'bow_pulling_2', 'crossbow_pulling_0', 'crossbow_pulling_1', 'crossbow_pulling_2', 'crossbow_arrow', 'crossbow_firework'];
+
+/** Integer line between two points on the 16×16 grid. */
+function gridLine(p: Painter, x0: number, y0: number, x1: number, y1: number, color: (i: number, n: number) => RGB): void {
+  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+  for (let i = 0; i <= n; i++) {
+    const x = Math.round(x0 + ((x1 - x0) * i) / Math.max(1, n)), y = Math.round(y0 + ((y1 - y0) * i) / Math.max(1, n));
+    if (x >= 0 && y >= 0 && x < 16 && y < 16) p.px(x, y, color(i, n));
+  }
+}
+
+/**
+ * Drawn bow: the string (the chord from the top-right tip to the bottom-left tip) is pulled back
+ * to a nock point and the arrow crosses the arc towards the upper left.
+ */
+function pulledBow(p: Painter, stage: number): void {
+  mask(p, 'bow', { ...ramp(WOOD), s: [0, 0, 0, 0] });
+  const string = hex('#e7e7e7'), shaft = hex('#6e5534'), tip = hex('#c8c8c8'), fletch = hex('#f0f0f0');
+  const nx = 9 + stage, ny = 8 + Math.round(stage * 0.5);
+  gridLine(p, 12, 2, nx, ny, () => string);
+  gridLine(p, nx, ny, 5, 13, () => string);
+  gridLine(p, nx, ny, nx - 9, ny - 4, (i, n) => (i <= 1 ? fletch : i >= n - 1 ? tip : shaft));
+}
+
+def('bow_pulling_0', (p) => pulledBow(p, 0));
+def('bow_pulling_1', (p) => pulledBow(p, 1));
+def('bow_pulling_2', (p) => pulledBow(p, 2));
+
+const crossbowPal = (): Pal => ({ ...ramp(hex('#8c8c8c')), a: hex('#6e5534'), w: hex('#dcdcdc') });
+function crossbowString(p: Painter, stage: number): void {
+  mask(p, 'crossbow', { ...crossbowPal(), w: [0, 0, 0, 0] });
+  const s = hex('#dcdcdc');
+  const cx = 10 - stage, cy = 10 - stage;
+  for (let i = 0; i <= 3; i++) p.px(Math.round(13 + (cx - 13) * i / 3), Math.round(7 + (cy - 7) * i / 3), s);
+  for (let i = 0; i <= 3; i++) p.px(Math.round(cx + (7 - cx) * i / 3), Math.round(cy + (11 - cy) * i / 3), s);
+}
+def('crossbow_pulling_0', (p) => crossbowString(p, 0));
+def('crossbow_pulling_1', (p) => crossbowString(p, 1));
+def('crossbow_pulling_2', (p) => crossbowString(p, 2));
+def('crossbow_arrow', (p) => {
+  crossbowString(p, 2);
+  const shaft = hex('#6e5534'), tip = hex('#c8c8c8');
+  for (let i = 0; i < 8; i++) p.px(4 + i, 11 - i, i >= 6 ? tip : shaft);
+});
+def('crossbow_firework', (p) => {
+  crossbowString(p, 2);
+  const tube = hex('#c83a2a'), cap = hex('#e8e0d0');
+  for (let i = 0; i < 6; i++) { p.px(5 + i, 10 - i, tube); p.px(6 + i, 10 - i, tube); }
+  p.px(11, 4, cap); p.px(12, 4, cap);
+});
+
 // ---------------------------------------------------------------------------------------------
 
 export function paintItemTexture(p: Painter, id: string): boolean {

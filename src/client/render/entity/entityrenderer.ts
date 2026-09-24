@@ -7,9 +7,10 @@ import type { Device, Pipeline, GpuBuffer, BindGroup, RenderPass, VertexBufferLa
 import { ENTITY_SHADER, ENTITY_VERTEX_SIZE } from '../shaders/entity';
 import { EntityMesh, TEX_SKIN } from './mesh';
 import { EntityTextures, ENTITY_TEX } from './textures';
-import { ItemModels, emitItem } from './itemmodel';
+import { ItemModels, emitItem, heldSprite } from './itemmodel';
 import { ENTITY_RENDERERS, RenderContext, renderHumanoid } from './renderers';
 import './mobs/index';
+import './projectiles';
 import { createPlayerModel } from './player';
 import type { WorldRenderer, Camera, WorldLayer } from '../renderer';
 import type { ClientLevel } from '../../world';
@@ -21,6 +22,7 @@ import { getOutlineShape } from '../../../common/block/registry';
 import * as M from '../../../common/math/mat4';
 import { lookVector } from '../../../common/math/geom';
 import { getItem } from '../../../common/item/items';
+import type { ItemStack } from '../../../common/item/stack';
 
 const LAYOUT: VertexBufferLayout = {
   stride: ENTITY_VERTEX_SIZE,
@@ -214,6 +216,9 @@ export class EntityRenderer implements WorldLayer {
     v.interp.equipment = [inv.mainHand, inv.offHand, inv.get(36), inv.get(37), inv.get(38), inv.get(39)];
     v.data['sneaking'] = pe.input.sneaking && !pe.input.flying;
     v.data['using'] = this.player.hand.using;
+    v.data['useItem'] = this.player.hand.using && !getItem(this.player.hand.shown.id)?.food && getItem(this.player.hand.shown.id)?.useAnim !== 'drink' ? this.player.hand.useStack.id : '';
+    v.data['useHand'] = this.player.hand.useOffhand ? 'off' : 'main';
+    v.data['useTicks'] = this.player.hand.useTicks;
     v.data['swimming'] = pe.input.swimming;
     v.data['sleeping'] = this.player.sleeping !== null;
     v.data['bedFacing'] = this.player.sleeping ?? 3;
@@ -255,36 +260,93 @@ export class EntityRenderer implements WorldLayer {
       arm.x = 1; arm.y = 0; arm.z = 0;
       arm.render(mesh, ENTITY_TEX);
     } else {
-      const model = this.items.get(stack.id);
-      if (model) {
-        const def = getItem(stack.id);
-        const eating = hs.using && (def?.food || def?.useAnim === 'drink');
-        // Swing arc
-        mesh.translate(-0.35 * swingArc, 0.18 * Math.sin(sq * Math.PI * 2), -0.2 * Math.sin(swing * Math.PI));
-        if (model.kind === 'block' && model.cube) {
-          mesh.translate(0.5, -0.42, -0.86);
-          if (eating) mesh.translate(-0.3, 0.12, 0.1);
-          mesh.rotate(0, -swingArc * 60 * D);
-          mesh.rotate(1, 45 * D);
-          mesh.rotate(0, 12 * D);
-          mesh.scale(0.24);
-        } else {
-          mesh.translate(0.44, -0.31, -0.66);
-          if (eating) {
-            const k = Math.min(1, hs.useTicks / 6);
-            mesh.translate(-0.36 * k, 0.1 * k + Math.abs(Math.cos(((hs.useTicks + partial) / 4) * Math.PI)) * 0.04 * k, 0.12 * k);
-            mesh.rotate(1, -50 * k * D);
-          }
-          mesh.rotate(0, -swingArc * 70 * D);
-          mesh.rotate(2, -Math.sin(swing * swing * Math.PI) * 20 * D);
-          // Mirror the sprite so tools point up-left from the hand, turned slightly sideways
-          mesh.rotate(1, (180 - 28) * D);
-          mesh.rotate(2, (def?.tool ? 8 : 0) * D);
-          mesh.scale(def?.tool ? 0.38 : 0.32);
-        }
-        emitItem(mesh, model, stack);
-      }
+      this.handItem(stack, false, swing, sq, swingArc, partial);
     }
+    mesh.pop();
+    // Off-hand item (shields, torches, maps…) mirrored on the left
+    const off = this.player.inventory.offHand;
+    if (!off.isEmpty()) {
+      mesh.push();
+      mesh.translate(-bobX, bobY, 0);
+      this.handItem(off, true, 0, 0, 0, partial);
+      mesh.pop();
+    }
+  }
+
+  /** One held item in view space; weapons take their use poses (drawing, loading, blocking). */
+  private handItem(stack: ItemStack, offhand: boolean, swing: number, sq: number, swingArc: number, partial: number): void {
+    const mesh = this.hand;
+    const hs = this.player.hand;
+    const D = Math.PI / 180;
+    const using = hs.using && hs.useOffhand === offhand && hs.useStack.id === stack.id;
+    const useTicks = using ? hs.useTicks + partial : 0;
+    const model = this.items.get(heldSprite(stack, using ? useTicks : null));
+    if (!model) return;
+    const def = getItem(stack.id);
+    mesh.push();
+    if (offhand) mesh.scale(-1, 1, 1);
+    const eating = using && (def?.food || def?.useAnim === 'drink');
+    // Swing arc
+    mesh.translate(-0.35 * swingArc, 0.18 * Math.sin(sq * Math.PI * 2), -0.2 * Math.sin(swing * Math.PI));
+    if (model.kind === 'block' && model.cube) {
+      mesh.translate(0.5, -0.42, -0.86);
+      if (eating) mesh.translate(-0.3, 0.12, 0.1);
+      mesh.rotate(0, -swingArc * 60 * D);
+      mesh.rotate(1, 45 * D);
+      mesh.rotate(0, 12 * D);
+      mesh.scale(0.24);
+    } else if (stack.id === 'shield') {
+      // Held at the side; raised in front when blocking
+      const k = using ? Math.min(1, useTicks / 5) : 0;
+      mesh.translate(0.5 - 0.3 * k, -0.44 + 0.16 * k, -0.78 + 0.1 * k);
+      mesh.rotate(1, (180 + 28 - 20 * k) * D);
+      mesh.rotate(0, (-6 + 6 * k) * D);
+      mesh.scale(0.46);
+    } else if (stack.id === 'bow' && using) {
+      // Drawn bow in the middle of the view, trembling at full draw
+      const power = Math.min(1, ((useTicks / 20) * (useTicks / 20) + (useTicks / 20) * 2) / 3);
+      const shake = power >= 1 ? Math.sin((useTicks - 0.1) * 1.3) * 0.004 : 0;
+      // Facing the view with the nocked arrow pointing up-left at the crosshair
+      mesh.translate(0.16, -0.12 + shake, -0.48 + power * 0.04);
+      mesh.rotate(1, -28 * D);
+      mesh.rotate(0, 8 * D);
+      mesh.rotate(2, -12 * D);
+      mesh.scale(0.46, 0.46, 0.46 * (1 + power * 0.2));
+    } else if (stack.id === 'crossbow' && (using || stack.data.charged?.length)) {
+      // Loading: tilted down; loaded: aimed straight ahead
+      const loaded = !!stack.data.charged?.length && !using;
+      mesh.translate(loaded ? 0.22 : 0.3, loaded ? -0.26 : -0.36, loaded ? -0.56 : -0.6);
+      mesh.rotate(1, (180 - (loaded ? 55 : 20)) * D);
+      mesh.rotate(0, (loaded ? 0 : 25) * D);
+      if (using) mesh.translate(Math.sin(useTicks * 0.9) * 0.004, 0, 0);
+      mesh.scale(0.46);
+    } else if (stack.id === 'trident' && using) {
+      // Pulled back overhead before the throw
+      const k = Math.min(1, useTicks / 10);
+      mesh.translate(0.34, -0.3 + 0.12 * k, -0.62 + 0.16 * k);
+      mesh.rotate(1, 70 * D);
+      mesh.rotate(0, 12 * k * D);
+      mesh.rotate(2, -45 * D);
+      mesh.scale(0.55);
+    } else if (stack.id === 'spyglass' && using) {
+      mesh.translate(0.05, -0.02, -0.25);
+      mesh.rotate(1, 180 * D);
+      mesh.scale(0.3);
+    } else {
+      mesh.translate(0.44, -0.31, -0.66);
+      if (eating) {
+        const k = Math.min(1, hs.useTicks / 6);
+        mesh.translate(-0.36 * k, 0.1 * k + Math.abs(Math.cos(((hs.useTicks + partial) / 4) * Math.PI)) * 0.04 * k, 0.12 * k);
+        mesh.rotate(1, -50 * k * D);
+      }
+      mesh.rotate(0, -swingArc * 70 * D);
+      mesh.rotate(2, -Math.sin(swing * swing * Math.PI) * 20 * D);
+      // Mirror the sprite so tools point up-left from the hand, turned slightly sideways
+      mesh.rotate(1, (180 - 28) * D);
+      mesh.rotate(2, (def?.tool ? 8 : 0) * D);
+      mesh.scale(def?.tool ? 0.38 : 0.32);
+    }
+    emitItem(mesh, model, stack);
     mesh.pop();
   }
 

@@ -81,7 +81,7 @@ export class LocalPlayer {
   /** Third-person animation state (same shape as ClientInterp's animation fields). */
   readonly anim = { limbSwing: 0, limbSwingAmount: 0, prevLimbSwingAmount: 0, swingTime: 0, swinging: false, swingOffhand: false, hurtTime: 0, deathTime: 0, age: 0 };
   /** First-person hand animation. */
-  readonly hand = { equip: 1, prevEquip: 1, shown: ItemStack.empty(), swing: 0, prevSwing: 0, using: false, useTicks: 0 };
+  readonly hand = { equip: 1, prevEquip: 1, shown: ItemStack.empty(), swing: 0, prevSwing: 0, using: false, useTicks: 0, useStack: ItemStack.empty(), useOffhand: false };
   private swingTicks = -1;
   /** Bed facing while sleeping (null = awake). Movement is frozen while asleep. */
   sleeping: number | null = null;
@@ -273,12 +273,28 @@ export class LocalPlayer {
     this.send({ type: 'action', action: 'release_use', x: Math.floor(t.x), y: Math.floor(t.y), z: Math.floor(t.z), face: 0, seq: this.seq });
   }
 
-  /** Can the held stack be used continuously (eaten / drunk)? */
+  /** Can the held stack be used continuously (eaten, drunk, drawn, raised)? */
   private usable(stack: ItemStack): boolean {
     const def = getItem(stack.id);
     if (!def) return false;
     if (def.food) return def.food.alwaysEdible === true || this.food < 20 || this.gameMode === 'creative';
-    return def.useAnim === 'drink';
+    if (def.useAnim === 'drink') return true;
+    const creative = this.gameMode === 'creative';
+    const inv = this.inventory;
+    const arrows = inv.count('arrow') + inv.count('spectral_arrow') + inv.count('tipped_arrow');
+    switch (stack.id) {
+      case 'bow': return creative || arrows > 0 || stack.getEnchant('infinity') > 0;
+      case 'crossbow': return !stack.data.charged?.length && (creative || arrows > 0 || inv.count('firework_rocket') > 0);
+      case 'trident': {
+        if (stack.getEnchant('riptide') === 0) return true;
+        const t = this.entity.transform;
+        const c = this.level.getChunk(Math.floor(t.x) >> 4, Math.floor(t.z) >> 4);
+        return this.entity.physics.inWater || (this.level.rain > 0.2 && !!c && c.motion.get(Math.floor(t.x) & 15, Math.floor(t.z) & 15) <= Math.floor(t.y + 1));
+      }
+      case 'shield': case 'spyglass': return true;
+      case 'goat_horn': return !((this.cooldowns.get('goat_horn') ?? 0) > this.level.gameTime);
+    }
+    return false;
   }
 
   drop(all: boolean): void {
@@ -420,8 +436,9 @@ export class LocalPlayer {
     const h = this.target;
     const creative = this.gameMode === 'creative';
     const hs = this.hand;
-    // Continuous use (eating / drinking) ends when the button is released
-    if (hs.using && (!input.isDown('use') || this.inventory.mainHand.id !== hs.shown.id)) this.stopUsingItem();
+    // Continuous use (eating, drawing a bow, blocking) ends when the button is released
+    const usedNow = hs.useOffhand ? this.inventory.offHand : this.inventory.mainHand;
+    if (hs.using && (!input.isDown('use') || usedNow.id !== hs.useStack.id)) this.stopUsingItem();
     // Attack entity
     if (input.pressed('attack') && this.targetEntity && !hs.using) {
       this.send({ type: 'interact', entityId: this.targetEntity.id, kind: 'attack', hand: 'main', hx: 0, hy: 0, hz: 0, sneaking: this.entity.input.sneaking, clientTick: this.level.gameTime });
@@ -485,10 +502,25 @@ export class LocalPlayer {
         const t = this.entity.transform;
         this.send({ type: 'useItem', hand: 'main', seq: this.seq, yaw: t.yaw, pitch: t.pitch });
       }
-      if (!stack.isEmpty() && this.usable(stack) && !(h && this.isInteractive(h.state))) {
+      const interactive = !!(h && this.isInteractive(h.state));
+      if (!stack.isEmpty() && this.usable(stack) && !interactive) {
         hs.using = true;
         hs.useTicks = 0;
+        hs.useStack = stack;
+        hs.useOffhand = false;
         this.entity.input.usingItem = true;
+      } else if (!interactive && !this.targetEntity) {
+        // The off hand is tried when the main hand does nothing (shields, torches…)
+        const off = this.inventory.offHand;
+        if (!off.isEmpty() && this.usable(off) && !(stack.id !== '' && getItem(stack.id)?.block && h)) {
+          const t = this.entity.transform;
+          this.send({ type: 'useItem', hand: 'off', seq: this.seq, yaw: t.yaw, pitch: t.pitch });
+          hs.using = true;
+          hs.useTicks = 0;
+          hs.useStack = off;
+          hs.useOffhand = true;
+          this.entity.input.usingItem = true;
+        }
       }
     }
     if (input.pressed('pickBlock') && h) {

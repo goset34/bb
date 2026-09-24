@@ -189,10 +189,33 @@ export function playerSurvivalTick(level: ServerLevel, p: ServerPlayer): void {
 // Using items (eating, drinking)
 // ---------------------------------------------------------------------------------------------
 
-interface UseState {
+export interface UseState {
   hand: 'main' | 'off';
   item: string;
   left: number;
+  /** Total use duration (ticks used = total - left). */
+  total: number;
+}
+
+/** Hooks for items used over time (bows, crossbows, tridents, shields, horns). */
+export const useHooks = {
+  /** The use button was released after `ticks` ticks. */
+  release: (_level: ServerLevel, _p: ServerPlayer, _hand: 'main' | 'off', _stack: ItemStack, _ticks: number): void => {},
+  /** Called every tick while using (crossbow loading sounds). */
+  tick: (_level: ServerLevel, _p: ServerPlayer, _stack: ItemStack, _ticks: number): void => {},
+};
+
+export function usingState(p: ServerPlayer): UseState | undefined {
+  return p.ext['using'] as UseState | undefined;
+}
+
+/** Start using an item for a fixed duration (non-food items: bows, shields…). */
+export function startUsingFor(p: ServerPlayer, hand: 'main' | 'off', stack: ItemStack, duration: number): boolean {
+  const cur = p.ext['using'] as UseState | undefined;
+  if (cur && cur.hand === hand && cur.item === stack.id) return true;
+  p.ext['using'] = { hand, item: stack.id, left: duration, total: duration } satisfies UseState;
+  p.entity.input.usingItem = true;
+  return true;
 }
 
 export function startUsing(p: ServerPlayer, hand: 'main' | 'off', stack: ItemStack): boolean {
@@ -205,7 +228,8 @@ export function startUsing(p: ServerPlayer, hand: 'main' | 'off', stack: ItemSta
     const creative = p.data.gameMode === 'creative';
     if (!def.food.alwaysEdible && e.food!.food >= 20 && !creative) return false;
   } else if (def.useAnim !== 'drink') return false;
-  p.ext['using'] = { hand, item: stack.id, left: def.useDuration ?? 32 } satisfies UseState;
+  const dur = def.useDuration ?? 32;
+  p.ext['using'] = { hand, item: stack.id, left: dur, total: dur } satisfies UseState;
   e.input.usingItem = true;
   return true;
 }
@@ -221,6 +245,16 @@ function tickItemUse(level: ServerLevel, p: ServerPlayer): void {
   const inv = p.inventory;
   const stack = u.hand === 'main' ? inv.mainHand : inv.offHand;
   if (stack.id !== u.item) return stopUsing(p);
+  const def = getItem(u.item);
+  if (!def?.food && def?.useAnim !== 'drink') {
+    // Held items (bows, shields…) run until released or their duration ends
+    useHooks.tick(level, p, stack, u.total - u.left);
+    if (--u.left <= 0) {
+      stopUsing(p);
+      useHooks.release(level, p, u.hand, stack, u.total);
+    }
+    return;
+  }
   if (--u.left > 0) {
     if (u.left % 4 === 0 && getItem(u.item)?.food) {
       const t = p.entity.transform;

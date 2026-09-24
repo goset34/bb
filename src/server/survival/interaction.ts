@@ -26,7 +26,7 @@ import { biomeId } from '../../common/worldgen/biomes';
 import type { ServerLevel } from '../level';
 import type { ServerPlayer } from '../player';
 import { dropFromPlayer, createItemEntity } from './items';
-import { startUsing, stopUsing } from './player';
+import { startUsing, usingState, useHooks, stopUsing } from './player';
 import { refreshEquipment } from './living';
 
 // Level event ids understood by the client (particles + sounds)
@@ -573,8 +573,15 @@ export function playerAction(p: ServerPlayer, action: string): void {
       refreshEquipment(p.entity);
       break;
     }
-    case 'release_use':
+    case 'release_use': {
+      const u = usingState(p);
       stopUsing(p);
+      if (u) {
+        const stack = u.hand === 'main' ? inv.mainHand : inv.offHand;
+        const def = getItem(u.item);
+        if (stack.id === u.item && !def?.food && def?.useAnim !== 'drink') useHooks.release(level, p, u.hand, stack, u.total - u.left);
+      }
       break;
+    }
   }
 }

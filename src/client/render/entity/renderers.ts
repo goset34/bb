@@ -9,7 +9,7 @@ import type { EntityMesh } from './mesh';
 import { TEX_SKIN, TEX_EMISSIVE, TEX_TRANSLUCENT } from './mesh';
 import type { EntityTextures } from './textures';
 import { ENTITY_TEX, registerEntityTexture } from './textures';
-import { ItemModels, emitItem } from './itemmodel';
+import { ItemModels, emitItem, heldSprite } from './itemmodel';
 import { createPlayerModel, posePlayer, PlayerModel } from './player';
 import { createArmorModel, ArmorModel } from './armor';
 import { ModelPart } from './model';
@@ -185,6 +185,11 @@ export function renderHumanoid(ctx: RenderContext, e: ClientEntity, x: number, y
   const main = eq[0] ?? ItemStack.empty(), off = eq[1] ?? ItemStack.empty();
   const sneaking = e.data['sneaking'] === true;
   const swimming = e.data['swimming'] === true;
+  // Item used over time: players send useItem, archer mobs flag `using`
+  let useItem = (e.data['useItem'] as string | undefined) ?? '';
+  if (!useItem && e.data['using'] === true && e.type !== 'player' && main.id === 'bow') useItem = 'bow';
+  if (!useItem && e.data['aggressive'] === true && main.id === 'bow') useItem = 'bow';
+  const useTicks = (e.data['useTicks'] as number | undefined) ?? (typeof e.data['useStart'] === 'number' ? i.age - (e.data['useStart'] as number) + p : 0);
   posePlayer(model, {
     limbSwing: i.limbSwing - i.limbSwingAmount * (1 - p),
     limbAmount: Math.min(1, i.prevLimbSwingAmount + (i.limbSwingAmount - i.prevLimbSwingAmount) * p),
@@ -192,6 +197,9 @@ export function renderHumanoid(ctx: RenderContext, e: ClientEntity, x: number, y
     swing: i.swinging ? Math.max(0, (i.swingTime + p) / 6) : 0, swingOffhand: i.swingOffhand,
     sneaking, holdingMain: !main.isEmpty(), holdingOff: !off.isEmpty(), using: e.data['using'] === true,
     age: i.age + p, swimming, flying: false,
+    useItem: useItem || undefined, useOffhand: e.data['useHand'] === 'off', useTicks,
+    crossbowCharged: (main.id === 'crossbow' && !!main.data.charged?.length) || (off.id === 'crossbow' && !!off.data.charged?.length),
+    chargeTicks: 25 - 5 * (useItem === 'crossbow' ? (e.data['useHand'] === 'off' ? off : main).getEnchant('quick_charge') : 0),
   });
   adjust?.(model, e, p);
   applyLight(ctx, x + ctx.cam[0], y + ctx.cam[1] + 1, z + ctx.cam[2]);
@@ -249,8 +257,10 @@ export function renderHumanoid(ctx: RenderContext, e: ClientEntity, x: number, y
     armorModel.rightBoot.render(mesh, ENTITY_TEX); armorModel.leftBoot.render(mesh, ENTITY_TEX);
   }
   // Held items
-  if (!main.isEmpty()) renderHeld(ctx, model.rightArm, main, false);
-  if (!off.isEmpty()) renderHeld(ctx, model.leftArm, off, true);
+  const usingMain = useItem && e.data['useHand'] !== 'off' && (e.data['using'] === true || e.type === 'player');
+  const usingOff = useItem && e.data['useHand'] === 'off';
+  if (!main.isEmpty()) renderHeld(ctx, model.rightArm, main, false, usingMain ? useTicks : null);
+  if (!off.isEmpty()) renderHeld(ctx, model.leftArm, off, true, usingOff ? useTicks : null);
   // Non-armor head items (carved pumpkin, heads) sit on the head as blocks
   if (head && !head.isEmpty() && !getItem(head.id)?.armor) {
     const m = ctx.items.get(head.id);
@@ -266,9 +276,9 @@ export function renderHumanoid(ctx: RenderContext, e: ClientEntity, x: number, y
   mesh.pop();
 }
 
-function renderHeld(ctx: RenderContext, arm: ModelPart, stack: ItemStack, left: boolean): void {
+function renderHeld(ctx: RenderContext, arm: ModelPart, stack: ItemStack, left: boolean, usingTicks: number | null): void {
   const mesh = ctx.mesh;
-  const m = ctx.items.get(stack.id);
+  const m = ctx.items.get(heldSprite(stack, usingTicks));
   if (!m) return;
   mesh.push();
   arm.applyTransform(mesh);

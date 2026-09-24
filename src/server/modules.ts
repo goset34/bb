@@ -6,3 +6,4 @@ import './survival/index';
 import './commands/index';
 import './commands/core';
 import './mobs/index';
+import './combat/index';

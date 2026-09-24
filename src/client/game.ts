@@ -187,6 +187,17 @@ export class Game {
       custom(p);
       return;
     }
+    // Server-set velocity of the local player (riptide, knockback) and explosion pushes
+    if (p.type === 'entityVelocity' && p['id'] === this.entityId) {
+      const ph = this.player.entity.physics;
+      ph.vx = p['vx'] as number; ph.vy = p['vy'] as number; ph.vz = p['vz'] as number;
+      return;
+    }
+    if (p.type === 'explosion') {
+      const ph = this.player.entity.physics;
+      ph.vx += p['kx'] as number; ph.vy += p['ky'] as number; ph.vz += p['kz'] as number;
+      return;
+    }
     if (this.entities.handle(p)) return;
     if (this.fx.handle(p, this.entityRenderer.breaking)) return;
     switch (p.type) {

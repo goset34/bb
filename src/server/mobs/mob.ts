@@ -115,6 +115,10 @@ export interface MobDef {
   walkTargetValue?(m: Mob, x: number, y: number, z: number): number;
   /** Offspring when two mobs breed (default: same type). */
   offspring?(m: Mob, partner: Mob): { type: string; data?: MobData } | null;
+  /** This mob killed another entity (charged hisser heads, wither roses…). */
+  onKill?(m: Mob, victim: Entity): void;
+  /** Struck by lightning; return true to replace the default damage and ignition. */
+  onLightning?(m: Mob, bolt: Entity): boolean;
   /** Flags passed to the loot table (sheep colour, sheared, variant…). */
   lootFlags?(m: Mob): Record<string, unknown>;
   /** Copy saved state to synchronised metadata (after spawn and after loading). */

@@ -59,6 +59,60 @@ export interface PlayerPose {
   age: number;
   swimming: boolean;
   flying: boolean;
+  /** Item being used over time (bow, crossbow, trident, shield, spyglass, goat_horn) and its hand. */
+  useItem?: string;
+  useOffhand?: boolean;
+  useTicks?: number;
+  /** A loaded crossbow is held (aiming pose). */
+  crossbowCharged?: boolean;
+  /** Crossbow charge duration for the loading animation. */
+  chargeTicks?: number;
+}
+
+/** Reference arm poses for items used over time. */
+function usePose(m: PlayerModel, p: PlayerPose): void {
+  const head = m.head;
+  const off = !!p.useOffhand;
+  const arm = off ? m.leftArm : m.rightArm;
+  const side = off ? -1 : 1;
+  switch (p.useItem) {
+    case 'bow': {
+      const [a, b] = off ? [m.leftArm, m.rightArm] : [m.rightArm, m.leftArm];
+      a.yRot = side * -0.1 + head.yRot;
+      b.yRot = side * (0.1 + 0.4) + head.yRot;
+      a.xRot = -Math.PI / 2 + head.xRot;
+      b.xRot = -Math.PI / 2 + head.xRot;
+      a.zRot = 0;
+      b.zRot = 0;
+      return;
+    }
+    case 'crossbow': {
+      const [a, b] = off ? [m.leftArm, m.rightArm] : [m.rightArm, m.leftArm];
+      a.yRot = side * -0.8;
+      a.xRot = -0.97079635;
+      b.xRot = a.xRot;
+      const f = Math.max(0, Math.min(1, (p.useTicks ?? 0) / Math.max(1, p.chargeTicks ?? 25)));
+      b.yRot = side * (0.4 + (0.85 - 0.4) * f);
+      b.xRot = b.xRot + (-Math.PI / 2 - b.xRot) * f;
+      return;
+    }
+    case 'shield':
+      arm.xRot = arm.xRot * 0.5 - 0.9424779;
+      arm.yRot = side * -Math.PI / 6;
+      return;
+    case 'trident':
+      arm.xRot = arm.xRot * 0.5 - Math.PI;
+      arm.yRot = 0;
+      return;
+    case 'spyglass':
+      arm.xRot = Math.max(-2.4, Math.min(3.3, head.xRot - 1.9198622 - (p.sneaking ? 0.2617994 : 0)));
+      arm.yRot = head.yRot - side * 0.2617994;
+      return;
+    case 'goat_horn':
+      arm.xRot = Math.max(-1.2, Math.min(1.2, head.xRot)) - 1.4835298;
+      arm.yRot = head.yRot - side * Math.PI / 6;
+      return;
+  }
 }
 
 const D = Math.PI / 180;
@@ -105,6 +159,13 @@ export function posePlayer(m: PlayerModel, p: PlayerPose): void {
     m.rightLeg.y = 12.2; m.leftLeg.y = 12.2;
     m.head.y = 19.8; m.body.y = 20.8;
     m.rightArm.y = 18.8; m.leftArm.y = 18.8;
+  }
+  if (p.useItem) usePose(m, p);
+  else if (p.crossbowCharged) {
+    m.rightArm.yRot = -0.3 + m.head.yRot;
+    m.leftArm.yRot = 0.6 + m.head.yRot;
+    m.rightArm.xRot = -Math.PI / 2 + m.head.xRot + 0.1;
+    m.leftArm.xRot = -1.5 + m.head.xRot;
   }
   if (p.swimming) {
     const s = p.limbSwing * 0.33;
